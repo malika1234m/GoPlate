@@ -20,7 +20,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Plate3D — Menus your customers can taste with their eyes",
+  title: "GoPlate — Menus your customers can taste with their eyes",
   description:
     "Turn your restaurant menu into an interactive 3D experience. Customers scan a QR code and explore every dish in 3D before they order.",
 };

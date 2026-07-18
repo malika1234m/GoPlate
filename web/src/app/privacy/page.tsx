@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Plate3D",
-  description: "How Plate3D collects, uses, and protects your data.",
+  title: "Privacy Policy — GoPlate",
+  description: "How GoPlate collects, uses, and protects your data.",
 };
 
 const sections: { title: string; body: string }[] = [
@@ -29,7 +29,7 @@ const sections: { title: string; body: string }[] = [
   },
   {
     title: "Contact",
-    body: "Questions or deletion requests: contact the Plate3D team at the email address listed on our Google Play store page.",
+    body: "Questions or deletion requests: contact the GoPlate team at the email address listed on our Google Play store page.",
   },
 ];
 
@@ -37,7 +37,7 @@ export default function Privacy() {
   return (
     <main className="max-w-2xl mx-auto px-6 py-16">
       <Link href="/" className="text-sm text-ink-faint hover:text-ink-dim transition-colors">
-        ← Plate3D
+        ← GoPlate
       </Link>
       <h1 className="mt-6 text-4xl text-ink" style={{ fontFamily: "var(--font-fraunces)" }}>
         Privacy policy

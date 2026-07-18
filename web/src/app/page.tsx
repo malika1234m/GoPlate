@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { NavBar } from "@/components/home/NavBar";
 import { HeroShowcase, type ShowcaseDish } from "@/components/home/HeroShowcase";
 import { Reveal, CountUp, LiveDish3D } from "@/components/home/Dynamic";
+import { PhoneVideo } from "@/components/home/PhoneVideo";
 
 export const dynamic = "force-dynamic";
 
@@ -147,6 +148,60 @@ const steps = [
   },
 ];
 
+/* The quiet problem: why text menus leave money on the table */
+const problems = [
+  {
+    title: "Guessing feels risky",
+    body: "When guests can't see a dish, they order the safest, cheapest thing they already know. Your best plates never get a chance.",
+  },
+  {
+    title: "Bad photos backfire",
+    body: "A dim, blurry phone photo makes a great dish look worse than no photo at all — and drags the whole menu down with it.",
+  },
+  {
+    title: "Unsure guests spend less",
+    body: "Hesitation quietly shrinks the bill: no starter, no dessert, no second look at the specials.",
+  },
+];
+
+/* Industry-backed payoff stats (independent research, not our claims) */
+const payoffStats = [
+  { value: 30, label: "Bigger average checks", source: "digital-menu industry data" },
+  { value: 94, label: "More buying confidence with 3D/AR", source: "retail AR studies" },
+  { value: 44, label: "More orders for dishes shown visually", source: "delivery-platform data" },
+] as const;
+
+/* Old menu vs GoPlate */
+const comparison: [string, string][] = [
+  ["Guests guess from a list of words", "Guests spin the dish in 3D and place it on their table in AR"],
+  ["Price changes mean reprinting", "Update from your phone — live for customers in seconds"],
+  ["The QR opens a flat PDF", "The QR opens an interactive menu with photos, videos and 3D"],
+  ["Orders wait for a busy waiter", "Guests order from their seat, straight to your kitchen (Pro)"],
+  ["Platforms like this cost €79–797/mo", "From $2/month — and your first month is free"],
+];
+
+/* Looping product clips in phone frames ("see it, don't read it") */
+const showcaseClips = [
+  {
+    src: "/showcase/film.mp4",
+    poster: "/showcase/film-poster.jpg",
+    title: "Film it once",
+    body: "Walk your phone around the plate. GoPlate trims and polishes the clip into a loop like this — automatically.",
+  },
+  {
+    src: "/showcase/explore.mp4",
+    poster: "/showcase/explore-poster.jpg",
+    title: "Customers crave it",
+    body: "On the menu, every dish moves. Guests spin plates in 3D, watch the kitchen work, and stop ordering blind.",
+  },
+  {
+    src: "/showcase/orders.mp4",
+    poster: "/showcase/orders-poster.jpg",
+    title: "Orders roll in",
+    body: "On Pro, guests order right from the menu — and it lands on your kitchen's Orders screen in seconds.",
+  },
+];
+
 const poppins = { fontFamily: "var(--font-poppins)" };
 
 export default async function Home() {
@@ -277,6 +332,57 @@ export default async function Home() {
           </div>
         </Reveal>
 
+        {/* ================= THE QUIET PROBLEM ================= */}
+        <section className="pt-24">
+          <Reveal>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">The quiet problem</p>
+            <h2 className="mt-3 text-3xl sm:text-5xl font-extrabold text-ink max-w-2xl leading-tight">
+              A menu of words is a menu of guesses
+            </h2>
+            <div className="mt-10 grid gap-5 sm:grid-cols-3">
+              {problems.map((p, i) => (
+                <div key={p.title} className="rounded-2xl bg-navy-900 border border-navy-800 p-7">
+                  <span className="text-xs font-extrabold tracking-widest text-ink-faint">0{i + 1}</span>
+                  <h3 className="mt-3 text-lg font-bold text-ink">{p.title}</h3>
+                  <p className="mt-2 text-sm text-ink-dim leading-relaxed">{p.body}</p>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+        </section>
+
+        {/* ================= THE PAYOFF (industry-sourced) ================= */}
+        <section className="pt-24">
+          <Reveal>
+            <div
+              className="rounded-3xl border border-navy-700 px-8 py-12 relative overflow-hidden"
+              style={{ background: "linear-gradient(140deg, var(--navy-900), #1c1712)" }}
+            >
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent text-center">
+                What seeing the dish changes
+              </p>
+              <h2 className="mt-3 text-3xl sm:text-4xl font-extrabold text-ink text-center">
+                People eat with their eyes first
+              </h2>
+              <div className="mt-10 grid gap-8 sm:grid-cols-3 text-center">
+                {payoffStats.map((s) => (
+                  <div key={s.label}>
+                    <p className="text-4xl sm:text-5xl font-extrabold text-accent">
+                      +<CountUp value={s.value} suffix="%" />
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-ink">{s.label}</p>
+                    <p className="mt-1 text-xs text-ink-faint">{s.source}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-8 text-center text-xs text-ink-faint max-w-xl mx-auto">
+                Independent industry research on visual and 3D/AR menus — results vary by venue, but the
+                direction is always the same: dishes people can see, sell.
+              </p>
+            </div>
+          </Reveal>
+        </section>
+
         {/* ================= FEATURES ================= */}
         <section id="features" className="pt-24 scroll-mt-10">
           <Reveal>
@@ -293,6 +399,27 @@ export default async function Home() {
                   <span className="block h-1 w-10 rounded-full" style={{ background: "var(--accent)" }} />
                   <h3 className="mt-4 text-xl font-bold text-ink">{f.title}</h3>
                   <p className="mt-2 text-sm text-ink-dim leading-relaxed">{f.body}</p>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+        </section>
+
+        {/* ================= SEE IT IN ACTION (looping clips) ================= */}
+        <section className="pt-24">
+          <Reveal>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent text-center">
+              See it in action
+            </p>
+            <h2 className="mt-3 text-3xl sm:text-5xl font-extrabold text-ink text-center">
+              Don&apos;t read it. <span className="text-accent">Watch it.</span>
+            </h2>
+            <div className="mt-12 grid gap-10 sm:grid-cols-3">
+              {showcaseClips.map((clip) => (
+                <div key={clip.title} className="text-center">
+                  <PhoneVideo src={clip.src} poster={clip.poster} label={clip.title} />
+                  <h3 className="mt-6 text-xl font-bold text-ink">{clip.title}</h3>
+                  <p className="mx-auto mt-2 max-w-xs text-sm text-ink-dim leading-relaxed">{clip.body}</p>
                 </div>
               ))}
             </div>
@@ -381,7 +508,7 @@ export default async function Home() {
           <Reveal>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">For restaurants</p>
           <h2 className="mt-3 text-3xl sm:text-5xl font-extrabold text-ink leading-tight">
-            Three steps to a 3D menu
+            Three steps. One afternoon. <span className="text-accent">Live tonight.</span>
           </h2>
           <div className="mt-10 grid gap-6 sm:grid-cols-3">
             {steps.map((step, i) => (
@@ -396,6 +523,36 @@ export default async function Home() {
                 <p className="text-sm text-ink-dim leading-relaxed">{step.body}</p>
               </div>
             ))}
+          </div>
+
+          {/* Old menu vs GoPlate */}
+          <div className="mt-20">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-ink text-center">
+              Same kitchen. Same dishes. <span className="text-accent">A different night.</span>
+            </h2>
+            <div className="mt-10 overflow-x-auto">
+              <div className="min-w-[560px] rounded-3xl border border-navy-700 overflow-hidden">
+                <div className="grid grid-cols-2 text-sm">
+                  <div className="bg-navy-900 px-6 py-4 font-bold text-ink-faint uppercase tracking-wider text-xs border-b border-navy-800">
+                    The old menu
+                  </div>
+                  <div className="px-6 py-4 font-bold uppercase tracking-wider text-xs border-b border-navy-800 text-white" style={{ background: "linear-gradient(100deg, var(--accent), #f5934f)" }}>
+                    With GoPlate
+                  </div>
+                  {comparison.map(([oldWay, newWay], i) => (
+                    <div key={i} className="contents">
+                      <div className={`bg-navy-900 px-6 py-4 text-ink-faint ${i < comparison.length - 1 ? "border-b border-navy-800" : ""}`}>
+                        {oldWay}
+                      </div>
+                      <div className={`bg-navy-800/60 px-6 py-4 text-ink-dim font-medium ${i < comparison.length - 1 ? "border-b border-navy-800" : ""}`}>
+                        <span className="mr-2 text-accent" aria-hidden>✓</span>
+                        {newWay}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* App CTA */}
