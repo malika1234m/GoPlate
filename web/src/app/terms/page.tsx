@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LegalBody, LegalHeader, type LegalSection } from "@/components/legal/LegalShell";
 
 export const metadata: Metadata = {
   title: "Terms of Service — GoPlate",
   description: "The agreement between GoPlate and the restaurants that use it.",
 };
 
-type Block =
-  | { kind: "p"; text: string }
-  | { kind: "list"; items: string[] };
-
-const sections: { title: string; blocks: Block[] }[] = [
+const sections: LegalSection[] = [
   {
+    id: "agreement",
     title: "1. The agreement",
     blocks: [
       {
@@ -21,6 +19,7 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "who-may-use",
     title: "2. Who may use GoPlate",
     blocks: [
       {
@@ -30,6 +29,7 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "your-account",
     title: "3. Your account",
     blocks: [
       {
@@ -43,7 +43,8 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
-    title: "4. Plans, trials, and billing",
+    id: "billing",
+    title: "4. Plans, trials & billing",
     blocks: [
       {
         kind: "list",
@@ -59,16 +60,14 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "your-content",
     title: "5. Your content",
     blocks: [
       {
         kind: "p",
         text: "Everything you upload — dish names, descriptions, prices, photos, videos, and the 3D models generated from them — remains yours. We claim no ownership. You grant us a limited licence to store, process, and display that content, solely to run the service: hosting your menu, generating 3D models (which involves sending photos and video frames to our 3D-generation partner), editing videos into menu clips, and showing your menu to the people you share it with. The licence ends when you delete the content or your account.",
       },
-      {
-        kind: "p",
-        text: "You are responsible for your content. In particular:",
-      },
+      { kind: "p", text: "You are responsible for your content. In particular:" },
       {
         kind: "list",
         items: [
@@ -80,6 +79,7 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "ordering",
     title: "6. Table ordering",
     blocks: [
       {
@@ -89,6 +89,7 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "acceptable-use",
     title: "7. Acceptable use",
     blocks: [
       {
@@ -103,7 +104,8 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
-    title: "8. Availability and changes to the service",
+    id: "availability",
+    title: "8. Availability & changes",
     blocks: [
       {
         kind: "p",
@@ -112,6 +114,7 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "liability",
     title: "9. Liability",
     blocks: [
       {
@@ -121,12 +124,17 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "ending",
     title: "10. Ending the agreement",
     blocks: [
       {
         kind: "list",
         items: [
-          "You can stop using GoPlate and delete your account at any time from inside the app (Account → Delete account). Deletion permanently removes your restaurants, menus, media, and order history.",
+          <>
+            You can stop using GoPlate and delete your account at any time from inside the app (
+            <strong className="font-semibold text-ink">Account → Delete account</strong>). Deletion
+            permanently removes your restaurants, menus, media, and order history.
+          </>,
           "We may suspend or terminate an account that seriously or repeatedly breaks these terms. Unless the breach makes it impossible, we will warn you and give you a chance to fix it first.",
           "If we ever discontinue GoPlate entirely, we will give account holders at least 60 days’ notice and a way to export their menu content.",
         ],
@@ -134,6 +142,7 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "law",
     title: "11. Governing law",
     blocks: [
       {
@@ -143,20 +152,33 @@ const sections: { title: string; blocks: Block[] }[] = [
     ],
   },
   {
+    id: "changes",
     title: "12. Changes to these terms",
     blocks: [
       {
         kind: "p",
-        text: "We may update these terms as the service evolves. For material changes we will email account holders at least 14 days before the new terms take effect; continuing to use GoPlate after that date means you accept them. The date below always shows the current version.",
+        text: "We may update these terms as the service evolves. For material changes we will email account holders at least 14 days before the new terms take effect; continuing to use GoPlate after that date means you accept them. The date at the top always shows the current version.",
       },
     ],
   },
   {
+    id: "contact",
     title: "13. Contact",
     blocks: [
       {
         kind: "p",
-        text: "Questions about these terms: email malikanishnatha4@gmail.com.",
+        text: (
+          <>
+            Questions about these terms:{" "}
+            <a
+              href="mailto:malikanishnatha4@gmail.com"
+              className="text-ink underline underline-offset-4 transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              malikanishnatha4@gmail.com
+            </a>
+            .
+          </>
+        ),
       },
     ],
   },
@@ -164,45 +186,35 @@ const sections: { title: string; blocks: Block[] }[] = [
 
 export default function Terms() {
   return (
-    <main className="max-w-2xl mx-auto px-6 py-16">
-      <Link href="/" className="text-sm text-ink-faint hover:text-ink-dim transition-colors">
-        ← GoPlate
-      </Link>
-      <h1 className="mt-6 text-4xl text-ink" style={{ fontFamily: "var(--font-fraunces)" }}>
-        Terms of service
-      </h1>
-      <p className="mt-2 text-sm text-ink-faint">Last updated: July 26, 2026</p>
-      {sections.map((s) => (
-        <section key={s.title} className="mt-10">
-          <h2 className="text-xl text-ink mb-2" style={{ fontFamily: "var(--font-fraunces)" }}>
-            {s.title}
-          </h2>
-          {s.blocks.map((b, i) =>
-            b.kind === "p" ? (
-              <p key={i} className="text-ink-dim leading-relaxed mt-3 first:mt-0">
-                {b.text}
-              </p>
-            ) : (
-              <ul key={i} className="mt-3 first:mt-0 space-y-2 list-disc pl-5 text-ink-dim leading-relaxed">
-                {b.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            )
-          )}
-        </section>
-      ))}
-      <p className="mt-12 text-sm text-ink-faint">
-        See also our{" "}
-        <Link href="/privacy" className="underline underline-offset-4 hover:text-ink-dim transition-colors">
-          Privacy policy
-        </Link>{" "}
-        and{" "}
-        <Link href="/about" className="underline underline-offset-4 hover:text-ink-dim transition-colors">
-          About us
-        </Link>
-        .
-      </p>
+    <main className="mx-auto max-w-4xl px-6 py-16">
+      <LegalHeader
+        eyebrow="GoPlate · Legal"
+        title="Terms of service"
+        updated="July 26, 2026"
+        readingTime="6 min read"
+      />
+      <LegalBody
+        sections={sections}
+        footer={
+          <p>
+            See also our{" "}
+            <Link
+              href="/privacy"
+              className="underline underline-offset-4 transition-colors hover:text-ink-dim"
+            >
+              Privacy policy
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="/about"
+              className="underline underline-offset-4 transition-colors hover:text-ink-dim"
+            >
+              About us
+            </Link>
+            .
+          </p>
+        }
+      />
     </main>
   );
 }
