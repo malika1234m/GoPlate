@@ -589,8 +589,16 @@ export default async function Home() {
             Plans &amp; pricing
           </Link>
           <span className="mx-3">·</span>
+          <Link href="/about" className="hover:text-ink-dim transition-colors underline underline-offset-4">
+            About us
+          </Link>
+          <span className="mx-3">·</span>
           <Link href="/privacy" className="hover:text-ink-dim transition-colors underline underline-offset-4">
             Privacy policy
+          </Link>
+          <span className="mx-3">·</span>
+          <Link href="/terms" className="hover:text-ink-dim transition-colors underline underline-offset-4">
+            Terms of service
           </Link>
         </p>
       </footer>
