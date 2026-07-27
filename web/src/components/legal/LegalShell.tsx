@@ -5,11 +5,7 @@ export type Audience = "owners" | "diners" | "everyone";
 
 export type Block =
   | { kind: "p"; text: React.ReactNode }
-  | { kind: "list"; items: React.ReactNode[] }
-  | {
-      kind: "partners";
-      partners: { name: string; role: string; sees: string }[];
-    };
+  | { kind: "list"; items: React.ReactNode[] };
 
 export type LegalSection = {
   id: string;
@@ -88,30 +84,12 @@ function Blocks({ blocks }: { blocks: Block[] }) {
             </p>
           );
         }
-        if (b.kind === "list") {
-          return (
-            <ul key={i} className="mt-4 space-y-2.5 first:mt-0">
-              {b.items.map((item, j) => (
-                <li key={j} className="flex gap-3 leading-relaxed text-ink-dim">
-                  <span aria-hidden className="mt-[11px] h-1 w-3 shrink-0 rounded-full bg-navy-700" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          );
-        }
         return (
-          <ul key={i} className="mt-5 space-y-3 first:mt-0">
-            {b.partners.map((partner) => (
-              <li
-                key={partner.name}
-                className="rounded-xl border border-navy-800 bg-navy-900 p-4 sm:flex sm:items-baseline sm:gap-4"
-              >
-                <p className="w-24 shrink-0 font-semibold text-ink">{partner.name}</p>
-                <div>
-                  <p className="text-sm text-ink-dim">{partner.role}</p>
-                  <p className="mt-1 text-sm text-ink-faint">Sees: {partner.sees}</p>
-                </div>
+          <ul key={i} className="mt-4 space-y-2.5 first:mt-0">
+            {b.items.map((item, j) => (
+              <li key={j} className="flex gap-3 leading-relaxed text-ink-dim">
+                <span aria-hidden className="mt-[11px] h-1 w-3 shrink-0 rounded-full bg-navy-700" />
+                <span>{item}</span>
               </li>
             ))}
           </ul>

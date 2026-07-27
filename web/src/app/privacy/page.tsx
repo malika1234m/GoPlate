@@ -94,37 +94,6 @@ const sections: LegalSection[] = [
     ],
   },
   {
-    id: "third-parties",
-    title: "The three companies we rely on",
-    audience: "everyone",
-    blocks: [
-      {
-        kind: "p",
-        text: "GoPlate shares data with exactly three service providers, each for one job. Nothing is shared with anyone else, and none of them may use your data for their own purposes.",
-      },
-      {
-        kind: "partners",
-        partners: [
-          {
-            name: "Meshy",
-            role: "Generates the 3D model of a dish from your photos and video frames.",
-            sees: "dish photos and video frames — never your account details.",
-          },
-          {
-            name: "Stripe",
-            role: "Processes card payments when you buy a plan on our website.",
-            sees: "your card details (directly — they never pass through GoPlate) and billing email.",
-          },
-          {
-            name: "Railway",
-            role: "Hosts GoPlate’s servers and database.",
-            sees: "encrypted traffic and stored data, as any hosting provider does.",
-          },
-        ],
-      },
-    ],
-  },
-  {
     id: "payments",
     title: "Payments",
     audience: "owners",
@@ -168,7 +137,7 @@ const sections: LegalSection[] = [
           "Sell your data — not owner data, not diner data.",
           "Show third-party advertising.",
           "Use your photos, videos, or 3D models for anything other than displaying your own menu — including training AI models.",
-          "Share data with anyone beyond the three processors named above, and only ever to the extent their one job requires.",
+          "Share data with anyone beyond the service providers that run GoPlate — 3D generation, payment processing, and hosting — and only ever to the extent those jobs require.",
         ],
       },
     ],
