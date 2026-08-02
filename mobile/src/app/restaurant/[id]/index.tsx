@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,10 +12,12 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import { api, mediaUrl, API_URL, RestaurantFull, MenuItem } from "@/lib/api";
 import { localToday } from "@/lib/upgrade";
 import { useKeyboardPadding } from "@/lib/keyboard";
+import { formatPrice } from "@/lib/currencies";
 import { Badge, BadgeTone, Button, Card, EmptyState, Icon, IconCircle, Chip, Input } from "@/components/ui";
 import { colors, font, GlyphName, radius } from "@/lib/theme";
 
@@ -46,8 +49,9 @@ const ACTIONS: { label: string; icon: GlyphName; to: "orders" | "qr" | "preview"
 export default function MenuEditor() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [restaurant, setRestaurant] = useState<RestaurantFull | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [addingCategory, setAddingCategory] = useState(false);
   const keyboardPad = useKeyboardPadding();
@@ -64,8 +68,6 @@ export default function MenuEditor() {
       setRestaurant(restaurant);
     } catch (err) {
       Alert.alert("Could not load menu", err instanceof Error ? err.message : "Try again");
-    } finally {
-      setLoading(false);
     }
   }, [id]);
 
@@ -74,6 +76,16 @@ export default function MenuEditor() {
       load();
     }, [load])
   );
+
+  /**
+   * Pull-to-refresh drives its own flag. Reusing `loading` here would flash the
+   * spinner on every return from the dish editor, since this screen reloads on
+   * focus.
+   */
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    load().finally(() => setRefreshing(false));
+  }, [load]);
 
   const addCategory = async () => {
     if (!newCategory.trim()) return;
@@ -113,6 +125,22 @@ export default function MenuEditor() {
 
   const toggleSoldOut = async (item: MenuItem) => {
     const soldOut = item.soldOutDate === localToday();
+    // Flip the pill immediately — a full menu reload takes long enough that the
+    // tap feels ignored otherwise. The reload below reconciles with the server.
+    const optimistic = soldOut ? "" : localToday();
+    setRestaurant((r) =>
+      r
+        ? {
+            ...r,
+            categories: r.categories.map((c) => ({
+              ...c,
+              items: c.items.map((i) =>
+                i.id === item.id ? { ...i, soldOutDate: optimistic } : i
+              ),
+            })),
+          }
+        : r
+    );
     try {
       await api.updateItem(item.id, { soldOutToday: !soldOut });
     } catch (err) {
@@ -158,9 +186,16 @@ export default function MenuEditor() {
       <Stack.Screen options={{ title: restaurant.name }} />
       <ScrollView
         style={{ flex: 1, backgroundColor: colors.bg }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 60 + keyboardPad }}
+        contentContainerStyle={{
+          padding: 16,
+          paddingBottom: insets.bottom + 48 + keyboardPad,
+        }}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.accent} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+          />
         }
         keyboardShouldPersistTaps="handled"
       >
@@ -215,6 +250,8 @@ export default function MenuEditor() {
                     })
                   }
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit category ${cat.name}`}
                   style={styles.iconBtn}
                 >
                   <Icon name="edit" size={16} color={colors.textDim} />
@@ -222,6 +259,8 @@ export default function MenuEditor() {
                 <Pressable
                   onPress={() => removeCategory(cat.id, cat.name)}
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete category ${cat.name}`}
                   style={styles.iconBtn}
                 >
                   <Icon name="delete" size={16} color={colors.textFaint} />
@@ -259,18 +298,25 @@ export default function MenuEditor() {
                       </View>
                       <View style={{ alignItems: "flex-end", gap: 8 }}>
                         <Text style={styles.price} allowFontScaling={false}>
-                          {item.price.toFixed(2)}
+                          {formatPrice(item.price, restaurant.currency)}
                         </Text>
                         <Pressable
                           onPress={() => toggleSoldOut(item)}
-                          hitSlop={6}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: soldOut }}
+                          accessibilityLabel={
+                            soldOut
+                              ? `${item.name} is sold out today. Tap to put it back on the menu.`
+                              : `Mark ${item.name} sold out for today`
+                          }
                           style={[styles.soldOutPill, soldOut && styles.soldOutPillActive]}
                         >
                           <Text
                             style={[styles.soldOutText, soldOut && { color: "#fff" }]}
                             allowFontScaling={false}
                           >
-                            86
+                            {soldOut ? "Sold out" : "In stock"}
                           </Text>
                         </Pressable>
                       </View>
@@ -284,7 +330,7 @@ export default function MenuEditor() {
               onPress={() =>
                 router.push({
                   pathname: "/item/new",
-                  params: { restaurantId: id, categoryId: cat.id },
+                  params: { restaurantId: id, categoryId: cat.id, currency: restaurant.currency },
                 })
               }
             >
@@ -318,9 +364,18 @@ export default function MenuEditor() {
         </Card>
       </ScrollView>
 
-      {/* Edit category overlay: name + serving window */}
-      {renaming && (
+      {/* Edit category: name + serving window. A real Modal so the Android
+          back button and a tap outside both close it. */}
+      <Modal
+        visible={!!renaming}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setRenaming(null)}
+      >
+        {renaming && (
         <View style={[styles.overlay, { paddingBottom: 24 + keyboardPad }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setRenaming(null)} />
           <Card style={{ width: "100%", padding: 18 }}>
             <Input
               label="Category name"
@@ -370,7 +425,8 @@ export default function MenuEditor() {
             </View>
           </Card>
         </View>
-      )}
+        )}
+      </Modal>
     </>
   );
 }
@@ -468,11 +524,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.full,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
   },
   soldOutPillActive: { backgroundColor: colors.danger, borderColor: colors.danger },
-  soldOutText: { fontSize: 11, fontFamily: font.heavy, color: colors.textFaint },
+  soldOutText: { fontSize: 11.5, fontFamily: font.bold, color: colors.textFaint },
   scheduleLabel: {
     color: colors.textDim,
     fontSize: 13,

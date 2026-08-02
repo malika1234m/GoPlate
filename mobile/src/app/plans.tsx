@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import { api, API_URL } from "@/lib/api";
 import { Badge, Button, Card, Icon } from "@/components/ui";
@@ -63,6 +64,7 @@ const PLANS: {
 ];
 
 export default function Plans() {
+  const insets = useSafeAreaInsets();
   const [billing, setBilling] = useState<Billing | null>(null);
   const [opening, setOpening] = useState(false);
 
@@ -103,7 +105,7 @@ export default function Plans() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
+      contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 48 }}
     >
       {/* Trial / plan status */}
       {billing && !billing.subscribed && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import { api, mediaUrl, API_URL, RestaurantFull } from "@/lib/api";
 import { Button, Card, Chip, Icon, Input, SectionHeader, Select } from "@/components/ui";
@@ -32,7 +33,9 @@ export default function Settings() {
   const [restaurant, setRestaurant] = useState<RestaurantFull | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingBrand, setUploadingBrand] = useState<"logo" | "cover" | null>(null);
+  const [brandProgress, setBrandProgress] = useState(0);
   const keyboardPad = useKeyboardPadding();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     api
@@ -84,13 +87,15 @@ export default function Settings() {
     }
   };
 
-  const uploadBrandImage = (kind: "logo" | "cover") =>
+  const uploadBrandImage = (kind: "logo" | "cover") => {
+    if (uploadingBrand) return;
     chooseSource(async (source) => {
       const uri = await captureMedia("image", source);
       if (!uri) return;
+      setBrandProgress(0);
       setUploadingBrand(kind);
       try {
-        const { url } = await api.upload(uri, "image");
+        const { url } = await api.upload(uri, "image", setBrandProgress);
         set(kind === "logo" ? { logoUrl: url } : { coverUrl: url });
       } catch (err) {
         Alert.alert("Upload failed", err instanceof Error ? err.message : "Try again");
@@ -98,6 +103,12 @@ export default function Settings() {
         setUploadingBrand(null);
       }
     });
+  };
+
+  const brandLabel = (kind: "logo" | "cover", idle: string) => {
+    if (uploadingBrand !== kind) return idle;
+    return brandProgress > 0 && brandProgress < 100 ? `${brandProgress}%` : "Uploading…";
+  };
 
   const preview = () => {
     WebBrowser.openBrowserAsync(`${API_URL}/r/${restaurant!.slug}`);
@@ -129,8 +140,9 @@ export default function Settings() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 60 + keyboardPad }}
+      contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 48 + keyboardPad }}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       <SectionHeader title="Basics" />
       <Card style={{ padding: 18 }}>
@@ -172,29 +184,51 @@ export default function Settings() {
         hint="The logo appears above your name on the menu; the cover photo sits behind the header."
       />
       <View style={styles.brandRow}>
-        <Pressable style={styles.brandBox} onPress={() => uploadBrandImage("logo")}>
+        <Pressable
+          style={styles.brandBox}
+          onPress={() => uploadBrandImage("logo")}
+          disabled={!!uploadingBrand}
+          accessibilityRole="button"
+          accessibilityLabel={restaurant.logoUrl ? "Replace logo" : "Add logo"}
+        >
           {restaurant.logoUrl ? (
             <Image source={{ uri: mediaUrl(restaurant.logoUrl) }} style={styles.brandFill} />
           ) : (
             <View style={styles.brandInner}>
               <Icon name="image" size={22} color={colors.accent} />
               <Text style={styles.brandHint} allowFontScaling={false}>
-                {uploadingBrand === "logo" ? "Uploading…" : "Logo"}
+                {brandLabel("logo", "Logo")}
               </Text>
             </View>
           )}
+          {uploadingBrand === "logo" && restaurant.logoUrl ? (
+            <View style={styles.brandBusy}>
+              <Text style={styles.brandHint}>{brandLabel("logo", "Logo")}</Text>
+            </View>
+          ) : null}
         </Pressable>
-        <Pressable style={[styles.brandBox, { flex: 2 }]} onPress={() => uploadBrandImage("cover")}>
+        <Pressable
+          style={[styles.brandBox, { flex: 2 }]}
+          onPress={() => uploadBrandImage("cover")}
+          disabled={!!uploadingBrand}
+          accessibilityRole="button"
+          accessibilityLabel={restaurant.coverUrl ? "Replace cover photo" : "Add cover photo"}
+        >
           {restaurant.coverUrl ? (
             <Image source={{ uri: mediaUrl(restaurant.coverUrl) }} style={styles.brandFill} />
           ) : (
             <View style={styles.brandInner}>
               <Icon name="photo_camera" size={22} color={colors.sky} />
               <Text style={styles.brandHint} allowFontScaling={false}>
-                {uploadingBrand === "cover" ? "Uploading…" : "Cover photo"}
+                {brandLabel("cover", "Cover photo")}
               </Text>
             </View>
           )}
+          {uploadingBrand === "cover" && restaurant.coverUrl ? (
+            <View style={styles.brandBusy}>
+              <Text style={styles.brandHint}>{brandLabel("cover", "Cover photo")}</Text>
+            </View>
+          ) : null}
         </Pressable>
       </View>
 
@@ -332,6 +366,13 @@ const styles = StyleSheet.create({
   },
   brandInner: { alignItems: "center", gap: 5 },
   brandFill: { width: "100%", height: "100%" },
+  brandBusy: {
+    position: "absolute",
+    inset: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(7,7,8,0.82)",
+  },
   brandHint: {
     color: colors.textDim,
     textAlign: "center",

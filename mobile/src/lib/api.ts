@@ -208,6 +208,8 @@ export type MenuItem = {
   categoryId: string;
   restaurantId: string;
   modifierGroups?: ModifierGroup[];
+  /** Only present on the single-item GET — used to price add-ons correctly. */
+  restaurant?: { currency: string };
 };
 
 export type RestaurantFull = Restaurant & { categories: Category[] };

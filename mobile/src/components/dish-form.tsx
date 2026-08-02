@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { api, mediaUrl, MenuItem } from "@/lib/api";
+import { formatPrice } from "@/lib/currencies";
 import { Card, Icon, Input } from "@/components/ui";
 import { colors, font, GlyphName, radius } from "@/lib/theme";
 
@@ -111,11 +112,14 @@ export function DishForm({
   draft,
   onChange,
   onRemoveMedia,
+  currency,
 }: {
   draft: DishDraft;
   onChange: (patch: Partial<DishDraft>) => void;
   /** When provided (edit screen), removal persists to the server immediately. */
   onRemoveMedia?: (kind: "image" | "video") => void;
+  /** ISO code of the restaurant, so the price field says which money this is. */
+  currency?: string;
 }) {
   const [uploading, setUploading] = useState<"image" | "video" | null>(null);
   const [progress, setProgress] = useState(0);
@@ -168,11 +172,19 @@ export function DishForm({
           style={[styles.mediaBox, !!uploading && styles.mediaBoxBusy]}
           onPress={() => addMedia("image")}
           disabled={!!uploading}
+          accessibilityRole="button"
+          accessibilityLabel={draft.imageUrl ? "Replace dish photo" : "Add dish photo"}
         >
           {draft.imageUrl ? (
             <>
               <Image source={{ uri: mediaUrl(draft.imageUrl) }} style={styles.mediaFill} />
-              <Pressable style={styles.removeChip} hitSlop={8} onPress={() => confirmRemove("image")}>
+              <Pressable
+                style={styles.removeChip}
+                hitSlop={8}
+                onPress={() => confirmRemove("image")}
+                accessibilityRole="button"
+                accessibilityLabel="Remove dish photo"
+              >
                 <Icon name="close" size={15} color="#fff" />
               </Pressable>
             </>
@@ -190,9 +202,17 @@ export function DishForm({
           style={[styles.mediaBox, !!uploading && styles.mediaBoxBusy]}
           onPress={() => addMedia("video")}
           disabled={!!uploading}
+          accessibilityRole="button"
+          accessibilityLabel={draft.videoUrl ? "Replace 360 degree video" : "Film 360 degree video"}
         >
           {draft.videoUrl ? (
-            <Pressable style={styles.removeChip} hitSlop={8} onPress={() => confirmRemove("video")}>
+            <Pressable
+              style={styles.removeChip}
+              hitSlop={8}
+              onPress={() => confirmRemove("video")}
+              accessibilityRole="button"
+              accessibilityLabel="Remove 360 degree video"
+            >
               <Icon name="close" size={15} color="#fff" />
             </Pressable>
           ) : null}
@@ -235,11 +255,16 @@ export function DishForm({
         multiline
       />
       <Input
-        label="Price"
+        label={currency ? `Price (${currency.toUpperCase()})` : "Price"}
         value={draft.price}
         onChangeText={(v) => onChange({ price: v.replace(",", ".") })}
         keyboardType="decimal-pad"
         placeholder="12.50"
+        hint={
+          draft.price && !Number.isNaN(Number(draft.price))
+            ? `Customers see ${formatPrice(Number(draft.price), currency)}`
+            : undefined
+        }
       />
 
       <Card style={{ paddingVertical: 6 }}>

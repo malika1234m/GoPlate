@@ -137,23 +137,47 @@ export function Button({
 export function Input(
   props: TextInputProps & { label?: string; hint?: string; error?: string }
 ) {
-  const { label, hint, error, style, ...rest } = props;
+  const { label, hint, error, style, secureTextEntry, ...rest } = props;
   const [focused, setFocused] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  // Typing a password blind on a phone keyboard is the usual reason a correct
+  // password gets rejected — every masked field gets a reveal toggle.
+  const isPassword = !!secureTextEntry;
+
   return (
     <View style={{ marginBottom: 14 }}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <TextInput
-        placeholderTextColor={colors.textFaint}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        style={[
-          styles.input,
-          focused && { borderColor: colors.accent },
-          !!error && { borderColor: colors.danger },
-          style,
-        ]}
-        {...rest}
-      />
+      <View>
+        <TextInput
+          placeholderTextColor={colors.textFaint}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          secureTextEntry={isPassword && !revealed}
+          style={[
+            styles.input,
+            isPassword && { paddingRight: 52 },
+            focused && { borderColor: colors.accent },
+            !!error && { borderColor: colors.danger },
+            style,
+          ]}
+          {...rest}
+        />
+        {isPassword ? (
+          <Pressable
+            onPress={() => setRevealed((v) => !v)}
+            hitSlop={10}
+            style={styles.reveal}
+            accessibilityRole="button"
+            accessibilityLabel={revealed ? "Hide password" : "Show password"}
+          >
+            <Icon
+              name="visibility"
+              size={19}
+              color={revealed ? colors.accent : colors.textFaint}
+            />
+          </Pressable>
+        ) : null}
+      </View>
       {error ? (
         <Text style={[styles.inputHint, { color: colors.danger }]}>{error}</Text>
       ) : hint ? (
@@ -453,6 +477,15 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
     fontFamily: font.regular,
+  },
+  reveal: {
+    position: "absolute",
+    right: 6,
+    top: 0,
+    bottom: 0,
+    width: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   inputHint: {
     color: colors.textFaint,

@@ -9,17 +9,36 @@ datasource db {
 }
 
 model User {
-  id                   String       @id @default(cuid())
-  email                String       @unique
+  id                   String               @id @default(cuid())
+  email                String               @unique
   passwordHash         String
   name                 String
-  plan                 String       @default("free") // free | pro
-  tokenVersion         Int          @default(0) // bump to revoke all existing sessions
-  trialEndsAt          DateTime?    // 30-day free trial; null = legacy account
-  stripeCustomerId     String       @default("")
-  stripeSubscriptionId String       @default("")
-  createdAt            DateTime     @default(now())
+  plan                 String               @default("free") // free | pro
+  tokenVersion         Int                  @default(0) // bump to revoke all existing sessions
+  trialEndsAt          DateTime? // 30-day free trial; null = legacy account
+  stripeCustomerId     String               @default("")
+  stripeSubscriptionId String               @default("")
+  createdAt            DateTime             @default(now())
   restaurants          Restaurant[]
+  passwordResets       PasswordResetToken[]
+}
+
+/**
+ * One-time "forgot password" link.
+ * Only the SHA-256 of the token is stored — a leaked database row can't be
+ * turned back into a working reset link. Rows are short-lived and are deleted
+ * once used or superseded.
+ */
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Order {
@@ -76,25 +95,25 @@ model Category {
 }
 
 model MenuItem {
-  id           String     @id @default(cuid())
-  name         String
-  caption      String     @default("") // short tasty one-liner shown under the dish name
-  description  String     @default("")
-  price        Float
-  imageUrl     String     @default("")
-  videoUrl     String     @default("")
-  storyVideoUrl String    @default("") // auto-edited "how it's made" clip
-  modelUrl     String     @default("") // GLB file once 3D generation completes
-  modelUsdzUrl String     @default("") // USDZ for iOS AR Quick Look
-  modelStatus  String     @default("NONE") // NONE | PROCESSING | READY | FAILED
-  modelJobId   String     @default("")
-  soldOutDate  String     @default("") // YYYY-MM-DD; sold out when it equals today
-  isVegetarian Boolean    @default(false)
-  isSpicy      Boolean    @default(false)
-  isAvailable  Boolean    @default(true)
-  sortOrder    Int        @default(0)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id             String          @id @default(cuid())
+  name           String
+  caption        String          @default("") // short tasty one-liner shown under the dish name
+  description    String          @default("")
+  price          Float
+  imageUrl       String          @default("")
+  videoUrl       String          @default("")
+  storyVideoUrl  String          @default("") // auto-edited "how it's made" clip
+  modelUrl       String          @default("") // GLB file once 3D generation completes
+  modelUsdzUrl   String          @default("") // USDZ for iOS AR Quick Look
+  modelStatus    String          @default("NONE") // NONE | PROCESSING | READY | FAILED
+  modelJobId     String          @default("")
+  soldOutDate    String          @default("") // YYYY-MM-DD; sold out when it equals today
+  isVegetarian   Boolean         @default(false)
+  isSpicy        Boolean         @default(false)
+  isAvailable    Boolean         @default(true)
+  sortOrder      Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   category       Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   categoryId     String
   restaurant     Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)

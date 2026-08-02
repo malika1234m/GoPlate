@@ -78,7 +78,14 @@ export function ModifierEditor({
         text: "Delete",
         style: "destructive",
         onPress: async () => {
-          await api.deleteModifierGroup(g.id);
+          try {
+            await api.deleteModifierGroup(g.id);
+          } catch (err) {
+            Alert.alert(
+              "Could not delete",
+              err instanceof Error ? err.message : "Check your connection and try again."
+            );
+          }
           onChanged();
         },
       },

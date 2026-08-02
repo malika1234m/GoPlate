@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import {
-  Alert,
   Image,
   Pressable,
   RefreshControl,
@@ -35,11 +34,14 @@ export default function Restaurants() {
   const [user, setUser] = useState<User | null>(null);
   const [billing, setBilling] = useState<Billing | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   const load = useCallback(async (isActive: () => boolean = () => true) => {
     try {
       const { restaurants } = await api.listRestaurants();
       if (!isActive()) return;
+      setOffline(false);
       setRestaurants(restaurants);
       api
         .me()
@@ -60,9 +62,10 @@ export default function Restaurants() {
         // Session expired — return to login
         await setToken(null);
         router.replace("/login");
-      } else {
-        // Network problem — keep the session, let the user retry
-        Alert.alert("Connection problem", "Couldn't load your restaurants. Pull down to retry.");
+      } else if (isActive()) {
+        // Network problem — keep the session and show a retry state rather than
+        // the empty state, which would read as "your restaurants are gone".
+        setOffline(true);
       }
     } finally {
       setLoading(false);
@@ -78,6 +81,15 @@ export default function Restaurants() {
       };
     }, [load])
   );
+
+  /**
+   * Pull-to-refresh keeps its own flag — this screen reloads on every focus, so
+   * sharing `loading` would flash the spinner each time the user comes back.
+   */
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    load().finally(() => setRefreshing(false));
+  }, [load]);
 
   const first = restaurants[0];
 
@@ -129,9 +141,18 @@ export default function Restaurants() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingTop: insets.top + 14, paddingBottom: 130 }}
+        contentContainerStyle={{
+          padding: 16,
+          paddingTop: insets.top + 14,
+          // Clear the floating button, which itself clears the nav bar.
+          paddingBottom: insets.bottom + 130,
+        }}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.accent} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+          />
         }
       >
         {/* Greeting header */}
@@ -147,12 +168,39 @@ export default function Restaurants() {
               </Text>
             ) : null}
           </View>
-          <Pressable onPress={() => router.push("/account")} style={styles.logoutBtn} hitSlop={6}>
+          <Pressable
+            onPress={() => router.push("/account")}
+            style={styles.logoutBtn}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Account settings"
+          >
             <Icon name="person" size={19} color={colors.textDim} />
           </Pressable>
         </View>
 
-        {restaurants.length === 0 && !loading && (
+        {offline && restaurants.length === 0 && !loading && (
+          <Card style={styles.offlineCard}>
+            <IconCircle name="link" size={48} color={colors.danger} background={colors.dangerSoft} />
+            <Text style={styles.offlineTitle}>Can&apos;t reach GoPlate</Text>
+            <Text style={styles.offlineBody}>
+              Your restaurants are safe — we just couldn&apos;t load them. Check your connection and
+              try again.
+            </Text>
+            <Button title="Try again" variant="secondary" onPress={() => load()} />
+          </Card>
+        )}
+
+        {offline && restaurants.length > 0 && (
+          <Pressable onPress={() => load()} style={styles.offlineBanner}>
+            <Icon name="link" size={16} color={colors.danger} />
+            <Text style={styles.offlineBannerText}>
+              Couldn&apos;t refresh — showing what we last loaded. Tap to retry.
+            </Text>
+          </Pressable>
+        )}
+
+        {!offline && restaurants.length === 0 && !loading && (
           <EmptyState
             icon="storefront"
             title="No restaurants yet"
@@ -329,7 +377,7 @@ export default function Restaurants() {
           ))}
       </ScrollView>
 
-      <View style={styles.fab}>
+      <View style={[styles.fab, { bottom: insets.bottom + 20 }]}>
         <Button title="New restaurant" icon="add" onPress={() => router.push("/restaurant/new")} />
       </View>
     </View>
@@ -355,6 +403,33 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
+  },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.md,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    marginBottom: 14,
+  },
+  offlineBannerText: {
+    flex: 1,
+    color: colors.textDim,
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontFamily: font.medium,
+  },
+  offlineCard: { alignItems: "center", gap: 12, padding: 24, marginTop: 8 },
+  offlineTitle: { color: colors.text, fontSize: 17, fontFamily: font.bold },
+  offlineBody: {
+    color: colors.textFaint,
+    fontSize: 13.5,
+    lineHeight: 20,
+    textAlign: "center",
+    fontFamily: font.regular,
+    marginBottom: 4,
   },
   hero: {
     borderRadius: radius.xl,
@@ -436,5 +511,5 @@ const styles = StyleSheet.create({
   },
   planTitle: { color: colors.text, fontSize: 15, fontFamily: font.bold },
   planMeta: { color: colors.textFaint, fontSize: 12.5, marginTop: 1, fontFamily: font.regular },
-  fab: { position: "absolute", bottom: 28, left: 20, right: 20 },
+  fab: { position: "absolute", left: 20, right: 20 },
 });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, setToken, User } from "@/lib/api";
 import { useKeyboardPadding } from "@/lib/keyboard";
 import { Button, Card, IconCircle, Input, SectionHeader } from "@/components/ui";
@@ -8,6 +9,7 @@ import { colors, font } from "@/lib/theme";
 
 export default function Account() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const keyboardPad = useKeyboardPadding();
   const [user, setUser] = useState<User | null>(null);
 
@@ -115,8 +117,9 @@ export default function Account() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 60 + keyboardPad }}
+      contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 48 + keyboardPad }}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       {/* Identity */}
       <Card style={styles.identity}>

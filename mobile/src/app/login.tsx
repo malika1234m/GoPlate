@@ -10,7 +10,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, setToken } from "@/lib/api";
+import * as WebBrowser from "expo-web-browser";
+import { api, API_URL, setToken } from "@/lib/api";
 import { useKeyboardPadding } from "@/lib/keyboard";
 import { Button, Card, Input } from "@/components/ui";
 import { colors, font } from "@/lib/theme";
@@ -22,9 +23,16 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState(false);
+
+  const emailError = touched && !email.trim() ? "Enter your email address." : "";
+  const passwordError = touched && !password ? "Enter your password." : "";
 
   const submit = async () => {
-    if (!email || !password) return;
+    // Without this the button silently does nothing on an empty field and the
+    // screen looks broken.
+    setTouched(true);
+    if (!email.trim() || !password) return;
     setLoading(true);
     try {
       const { token } = await api.login(email.trim(), password);
@@ -72,6 +80,8 @@ export default function Login() {
             autoComplete="email"
             textContentType="emailAddress"
             placeholder="you@restaurant.com"
+            error={emailError}
+            returnKeyType="next"
           />
           <Input
             label="Password"
@@ -83,6 +93,9 @@ export default function Login() {
             autoComplete="current-password"
             textContentType="password"
             placeholder="••••••••"
+            error={passwordError}
+            returnKeyType="go"
+            onSubmitEditing={submit}
           />
           <Button
             title="Sign in"
@@ -91,6 +104,15 @@ export default function Login() {
             loading={loading}
             style={{ marginTop: 4 }}
           />
+          {/* Reset happens on the web — the emailed link opens there anyway, so
+              there's nothing to duplicate in the app. */}
+          <Pressable
+            onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/forgot-password`)}
+            style={styles.forgotTap}
+            hitSlop={8}
+          >
+            <Text style={styles.forgot}>Forgot your password?</Text>
+          </Pressable>
         </Card>
 
         <Pressable
@@ -123,6 +145,8 @@ const styles = StyleSheet.create({
     fontFamily: font.regular,
   },
   formCard: { padding: 20, borderRadius: 24 },
+  forgotTap: { alignItems: "center", marginTop: 14, paddingVertical: 6 },
+  forgot: { color: colors.textDim, fontSize: 13.5, fontFamily: font.semibold },
   switchTap: { marginTop: 20, paddingVertical: 10 },
   switch: {
     color: colors.textDim,

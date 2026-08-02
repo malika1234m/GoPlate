@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, MenuItem } from "@/lib/api";
 import { handleUpgradeError } from "@/lib/upgrade";
+import { currencySymbol } from "@/lib/currencies";
 import { useKeyboardPadding } from "@/lib/keyboard";
 import { Badge, BadgeTone, Button, Card, IconCircle } from "@/components/ui";
 import { ModifierEditor } from "@/components/modifier-editor";
@@ -28,6 +30,9 @@ export default function EditDish() {
   const router = useRouter();
   const [item, setItem] = useState<MenuItem | null>(null);
   const [draft, setDraft] = useState<DishDraft | null>(null);
+  // Held separately: only the initial GET carries the restaurant, so reading it
+  // off `item` would blank out after any PATCH response replaces it.
+  const [currency, setCurrency] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [uploadingStory, setUploadingStory] = useState(false);
@@ -35,6 +40,7 @@ export default function EditDish() {
   const [progress, setProgress] = useState<number | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const keyboardPad = useKeyboardPadding();
+  const insets = useSafeAreaInsets();
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -71,6 +77,7 @@ export default function EditDish() {
       .then(({ item }) => {
         setItem(item);
         setDraft(draftFromItem(item));
+        setCurrency(item.restaurant?.currency);
         if (item.modelStatus === "PROCESSING") startPolling();
       })
       .catch(() => {
@@ -222,8 +229,9 @@ export default function EditDish() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 60 + keyboardPad }}
+      contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 48 + keyboardPad }}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       {/* 3D model */}
       <Card style={styles.statusCard}>
@@ -319,6 +327,7 @@ export default function EditDish() {
       <DishForm
         draft={draft}
         onChange={onChange}
+        currency={currency}
         onRemoveMedia={async (kind) => {
           try {
             const { item: updated } = await api.updateItem(
@@ -336,7 +345,7 @@ export default function EditDish() {
       <ModifierEditor
         itemId={id}
         groups={item.modifierGroups ?? []}
-        currencySymbol=""
+        currencySymbol={currencySymbol(currency)}
         onChanged={reloadItem}
       />
 

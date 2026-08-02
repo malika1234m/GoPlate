@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/portal";
 import { Btn, ErrorNote, Field, inputCls } from "@/components/portal/ui";
 
 export function LoginClient() {
   const router = useRouter();
+  // Set by the reset flow so a finished reset lands on a confirmation, not a
+  // bare sign-in form that gives no sign anything happened.
+  const justReset = useSearchParams().get("reset") === "1";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,6 +53,18 @@ export function LoginClient() {
           <h1 className="mt-8 text-center text-3xl font-extrabold text-ink">Welcome back</h1>
           <p className="mt-2 text-center text-sm text-ink-dim">Sign in to manage your menu.</p>
 
+          {justReset && (
+            <p
+              className="mt-6 flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm font-semibold"
+              style={{ background: "rgba(123,178,106,0.14)", color: "#8fc47d" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="mt-px shrink-0">
+                <path d="m4 12.5 5 5L20 6.5" />
+              </svg>
+              Password updated. Sign in with your new password.
+            </p>
+          )}
+
           <form onSubmit={submit} className="mt-8 space-y-4 rounded-[24px] border border-navy-700 bg-navy-900 p-7 sm:p-8">
             <Field label="Email">
               <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@restaurant.com" className={inputCls} />
@@ -57,6 +72,11 @@ export function LoginClient() {
             <Field label="Password">
               <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className={inputCls} />
             </Field>
+            <div className="flex justify-end">
+              <Link href="/forgot-password" className="text-xs font-semibold text-ink-dim hover:text-accent">
+                Forgot your password?
+              </Link>
+            </div>
             <ErrorNote message={error} />
             <Btn type="submit" loading={busy} className="w-full">Sign in</Btn>
             <p className="text-center text-xs text-ink-faint">

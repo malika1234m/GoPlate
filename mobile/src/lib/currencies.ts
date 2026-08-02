@@ -80,6 +80,24 @@ export function currencyLabel(code: string): string {
 }
 
 /**
+ * Symbol for a code, falling back to the code itself so an unlisted currency
+ * still reads sensibly ("CHF 12.50") instead of showing a bare number.
+ */
+export function currencySymbol(code?: string): string {
+  if (!code) return "";
+  return BY_CODE.get(code.toUpperCase())?.symbol ?? code.toUpperCase();
+}
+
+/** Price as the owner's customers will see it, e.g. "Rs 1250.00". */
+export function formatPrice(amount: number, code?: string): string {
+  const symbol = currencySymbol(code);
+  const value = amount.toFixed(2);
+  if (!symbol) return value;
+  // Multi-character symbols and bare codes read better with a space.
+  return symbol.length > 1 ? `${symbol} ${value}` : `${symbol}${value}`;
+}
+
+/**
  * Options for the <Select>. If the restaurant already uses a code we don't
  * list (set on the web, or added later), it's prepended so the field never
  * shows an empty value or silently drops the owner's choice.

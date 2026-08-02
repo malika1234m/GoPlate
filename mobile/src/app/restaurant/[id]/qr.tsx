@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import { api } from "@/lib/api";
 import { Button, Icon } from "@/components/ui";
@@ -15,6 +17,7 @@ import { colors, font, radius } from "@/lib/theme";
 
 export default function QrScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const [qr, setQr] = useState<{ menuUrl: string; qrDataUrl: string } | null>(null);
   const [error, setError] = useState("");
 
@@ -43,7 +46,12 @@ export default function QrScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.bg }}
+      // The QR, its caption and both buttons overflow a short screen, so this
+      // has to scroll or "Open menu" ends up under the navigation bar.
+      contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 40 }]}
+    >
       {error ? (
         <>
           <Text style={{ color: colors.danger, textAlign: "center", fontFamily: font.medium }}>
@@ -83,14 +91,13 @@ export default function QrScreen() {
           />
         </>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: colors.bg,
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 28,

@@ -42,6 +42,9 @@ export async function GET(req: Request, { params }: Params) {
   const full = await prisma.menuItem.findUnique({
     where: { id },
     include: {
+      // The editor shows prices and add-on deltas, so it needs the currency
+      // without a second round-trip for the whole restaurant.
+      restaurant: { select: { currency: true } },
       modifierGroups: {
         orderBy: { sortOrder: "asc" },
         include: { options: { orderBy: { sortOrder: "asc" } } },

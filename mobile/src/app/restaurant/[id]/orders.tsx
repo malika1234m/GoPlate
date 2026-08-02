@@ -1,7 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, Order } from "@/lib/api";
+import { formatPrice } from "@/lib/currencies";
 import { Badge, BadgeTone, Button, Card, EmptyState } from "@/components/ui";
 import { colors, font } from "@/lib/theme";
 
@@ -22,8 +24,26 @@ function timeAgo(iso: string): string {
 
 export default function Orders() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [currency, setCurrency] = useState<string | undefined>(undefined);
+
+  // Fetched once — order totals are meaningless without the currency, and the
+  // orders payload doesn't carry it.
+  useEffect(() => {
+    let active = true;
+    api
+      .getRestaurant(id)
+      .then(({ restaurant }) => {
+        if (active) setCurrency(restaurant.currency);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   const load = useCallback(async () => {
     try {
@@ -43,6 +63,13 @@ export default function Orders() {
       return () => clearInterval(t);
     }, [load])
   );
+
+  // Separate from `loading` so the 15s poll never spins the pull-to-refresh
+  // control while the kitchen is looking at the list.
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    load().finally(() => setRefreshing(false));
+  }, [load]);
 
   const advance = async (order: Order) => {
     const next: Order["status"] =
@@ -76,11 +103,15 @@ export default function Orders() {
   return (
     <FlatList
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+      contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 48 }}
       data={orders}
       keyExtractor={(o) => o.id}
       refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.accent} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+        />
       }
       ListEmptyComponent={
         loading ? null : (
@@ -123,6 +154,9 @@ export default function Orders() {
                       <Text style={styles.lineOpts}>{l.options.join(" · ")}</Text>
                     )}
                   </View>
+                  <Text style={styles.lineTotal} allowFontScaling={false}>
+                    {formatPrice(l.lineTotal, currency)}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -133,7 +167,7 @@ export default function Orders() {
 
             <View style={styles.footerRow}>
               <Text style={styles.total} allowFontScaling={false}>
-                {order.total.toFixed(2)}
+                {formatPrice(order.total, currency)}
               </Text>
               {(order.status === "NEW" || order.status === "PREPARING") && (
                 <View style={{ flexDirection: "row", gap: 8 }}>
@@ -169,6 +203,7 @@ const styles = StyleSheet.create({
   lineQty: { color: colors.accent, fontSize: 14, fontFamily: font.heavy, width: 28 },
   lineName: { color: colors.text, fontSize: 14, fontFamily: font.medium },
   lineOpts: { color: colors.textFaint, fontSize: 12, marginTop: 1, fontFamily: font.regular },
+  lineTotal: { color: colors.textDim, fontSize: 13, fontFamily: font.semibold },
   note: {
     color: colors.sky,
     fontSize: 13,
