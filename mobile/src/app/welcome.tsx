@@ -116,15 +116,20 @@ export default function Welcome() {
 
         {last ? (
           <>
+            {/* The tour ends at sign-in: most people arriving here already
+                registered on the web, and new users get the create-account
+                link right below. */}
             <Button
               title="Get started"
               icon="arrow_forward"
-              onPress={() => finish("/register")}
+              onPress={() => finish("/login")}
             />
-            <Pressable onPress={() => finish("/login")} style={styles.signIn} hitSlop={8}>
+            <Pressable onPress={() => finish("/register")} style={styles.signIn} hitSlop={8}>
               <Text style={styles.signInText}>
-                Already have an account?{" "}
-                <Text style={{ color: colors.accent, fontFamily: font.semibold }}>Sign in</Text>
+                New to GoPlate?{" "}
+                <Text style={{ color: colors.accent, fontFamily: font.semibold }}>
+                  Create an account
+                </Text>
               </Text>
             </Pressable>
           </>

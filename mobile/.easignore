@@ -1,0 +1,5 @@
+*.aab
+*.apk
+*.ipa
+store-screenshots/
+brand-assets/

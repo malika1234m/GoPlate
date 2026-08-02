@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import { api, API_URL, setToken } from "@/lib/api";
 import { useKeyboardPadding } from "@/lib/keyboard";
@@ -20,6 +21,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export default function Register() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const keyboardPad = useKeyboardPadding();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -63,11 +65,18 @@ export default function Register() {
       <ScrollView
         contentContainerStyle={[
           styles.container,
+          // This screen is taller than a short phone's viewport, so it has to
+          // scroll — and the last element (the sign-in link) has to clear the
+          // status bar and the gesture/nav bar, or it can't be tapped at all.
+          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 32 },
           // Anchor to top while the keyboard is open so fields never hide behind it.
-          keyboardPad > 0 && { justifyContent: "flex-start", paddingTop: 24, paddingBottom: 24 + keyboardPad },
+          keyboardPad > 0 && {
+            justifyContent: "flex-start",
+            paddingBottom: insets.bottom + 32 + keyboardPad,
+          },
         ]}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
       >
         <View style={styles.hero}>
           <Image source={require("../../assets/images/plate-logo.png")} style={styles.logoImg} />
@@ -149,7 +158,11 @@ export default function Register() {
           </Text>
         </Card>
 
-        <Pressable onPress={() => router.replace("/login")} style={{ marginTop: 26 }}>
+        <Pressable
+          onPress={() => router.replace("/login")}
+          style={styles.switchTap}
+          hitSlop={10}
+        >
           <Text style={styles.switch}>
             Already have an account? <Text style={styles.switchAccent}>Sign in</Text>
           </Text>
@@ -160,7 +173,7 @@ export default function Register() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: "center", padding: 24 },
+  container: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24 },
   hero: { alignItems: "center", marginBottom: 26 },
   logoImg: { width: 68, height: 68, marginBottom: 14 },
   stepChip: {
@@ -187,6 +200,7 @@ const styles = StyleSheet.create({
     maxWidth: 310,
   },
   formCard: { padding: 20, borderRadius: 24 },
+  switchTap: { marginTop: 20, paddingVertical: 10 },
   switch: {
     color: colors.textDim,
     textAlign: "center",

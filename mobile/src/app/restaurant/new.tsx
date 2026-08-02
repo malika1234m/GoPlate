@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "@/lib/api";
 import { handleUpgradeError } from "@/lib/upgrade";
 import { useKeyboardPadding } from "@/lib/keyboard";
-import { Button, Card, IconCircle, Input } from "@/components/ui";
+import { Button, Card, IconCircle, Input, Select } from "@/components/ui";
+import { currencyOptions } from "@/lib/currencies";
 import { colors, font, radius } from "@/lib/theme";
 
 export default function NewRestaurant() {
@@ -24,12 +25,10 @@ export default function NewRestaurant() {
   const [touched, setTouched] = useState(false);
 
   const nameError = touched && !name.trim() ? "Give your restaurant a name." : "";
-  const currencyOk = /^[A-Za-z]{3}$/.test(currency.trim());
-  const currencyError = touched && !currencyOk ? "Use a 3-letter code like USD, EUR, LKR." : "";
 
   const submit = async () => {
     setTouched(true);
-    if (!name.trim() || !currencyOk) return;
+    if (!name.trim()) return;
     setLoading(true);
     try {
       const { restaurant } = await api.createRestaurant({
@@ -37,7 +36,7 @@ export default function NewRestaurant() {
         description,
         address,
         phone,
-        currency: currency.trim().toUpperCase() || "USD",
+        currency: currency || "USD",
       });
       router.replace(`/restaurant/${restaurant.id}`);
     } catch (err) {
@@ -57,9 +56,11 @@ export default function NewRestaurant() {
         contentContainerStyle={{
           padding: 16,
           paddingTop: isOnboarding ? insets.top + 24 : 16,
-          paddingBottom: 60 + keyboardPad,
+          // Clear the gesture/nav bar so the last control stays tappable.
+          paddingBottom: insets.bottom + 48 + keyboardPad,
         }}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {isOnboarding ? (
           <View style={styles.onboardHero}>
@@ -99,7 +100,8 @@ export default function NewRestaurant() {
             label="Short description"
             value={description}
             onChangeText={setDescription}
-            placeholder="Slow food, open fire."
+            placeholder="Family-run Italian kitchen in the old town"
+            hint="One line about your restaurant, shown under its name on your menu. Optional."
             multiline
           />
           <Input
@@ -115,14 +117,15 @@ export default function NewRestaurant() {
             placeholder="+1 555 010 2030"
             keyboardType="phone-pad"
           />
-          <Input
+          <Select
             label="Currency"
+            title="Choose your currency"
             value={currency}
-            onChangeText={setCurrency}
-            placeholder="USD"
-            autoCapitalize="characters"
-            error={currencyError}
-            hint="ISO code shown next to prices — USD, EUR, GBP…"
+            onChange={setCurrency}
+            options={currencyOptions(currency)}
+            searchable
+            searchPlaceholder="Search currency or code"
+            hint="Shown next to every price on your menu."
           />
         </Card>
 

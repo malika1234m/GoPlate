@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, setToken } from "@/lib/api";
 import { useKeyboardPadding } from "@/lib/keyboard";
 import { Button, Card, Input } from "@/components/ui";
@@ -16,6 +17,7 @@ import { colors, font } from "@/lib/theme";
 
 export default function Login() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const keyboardPad = useKeyboardPadding();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,10 +42,16 @@ export default function Login() {
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          keyboardPad > 0 && { justifyContent: "flex-start", paddingTop: 24, paddingBottom: 24 + keyboardPad },
+          // Keep the create-account link clear of the status bar and the
+          // gesture/nav bar so it stays tappable on short phones.
+          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 32 },
+          keyboardPad > 0 && {
+            justifyContent: "flex-start",
+            paddingBottom: insets.bottom + 32 + keyboardPad,
+          },
         ]}
-        showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <View style={styles.hero}>
           <Image source={require("../../assets/images/plate-logo.png")} style={styles.logoImg} />
@@ -85,7 +93,11 @@ export default function Login() {
           />
         </Card>
 
-        <Pressable onPress={() => router.push("/register")} style={{ marginTop: 26 }}>
+        <Pressable
+          onPress={() => router.push("/register")}
+          style={styles.switchTap}
+          hitSlop={10}
+        >
           <Text style={styles.switch}>
             New to GoPlate? <Text style={styles.switchAccent}>Create an account</Text>
           </Text>
@@ -96,7 +108,7 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: "center", padding: 24 },
+  container: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24 },
   hero: { alignItems: "center", marginBottom: 28 },
   logoImg: { width: 88, height: 88, marginBottom: 14 },
   logo: {
@@ -111,6 +123,7 @@ const styles = StyleSheet.create({
     fontFamily: font.regular,
   },
   formCard: { padding: 20, borderRadius: 24 },
+  switchTap: { marginTop: 20, paddingVertical: 10 },
   switch: {
     color: colors.textDim,
     textAlign: "center",

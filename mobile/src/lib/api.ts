@@ -1,3 +1,4 @@
+import { File, UploadType, type UploadResult } from "expo-file-system";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
@@ -32,24 +33,23 @@ export class ApiError extends Error {
 
 async function request<T>(
   path: string,
-  options: { method?: string; body?: unknown; formData?: FormData } = {}
+  options: { method?: string; body?: unknown } = {}
 ): Promise<T> {
   const token = await getToken();
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
-  // Don't hang forever on dead connections. Uploads get room for big videos.
+  // Don't hang forever on dead connections. File uploads use uploadFile below.
   const controller = new AbortController();
-  const timeoutMs = options.formData ? 10 * 60_000 : 20_000;
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const timeout = setTimeout(() => controller.abort(), 20_000);
 
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: options.method ?? "GET",
       headers,
-      body: options.formData ?? (options.body !== undefined ? JSON.stringify(options.body) : undefined),
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
     });
   } catch (err) {
@@ -64,6 +64,78 @@ async function request<T>(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new ApiError(res.status, (data as { error?: string }).error ?? `Request failed (${res.status})`);
+  }
+  return data as T;
+}
+
+/**
+ * Upload one local file as multipart/form-data.
+ *
+ * SDK 57's global fetch is the winter-runtime fetch, which only accepts strings
+ * and real Blob/File objects — React Native's { uri, name, type } parts fail
+ * with "Unsupported FormDataPart implementation". A native upload task streams
+ * the file straight from disk, so a 130 MB dish film never has to be read into
+ * JS memory the way FormData + fetch would require.
+ */
+export type UploadProgressFn = (percent: number) => void;
+
+async function uploadFile<T>(
+  path: string,
+  uri: string,
+  mime: string,
+  onProgress?: UploadProgressFn
+): Promise<T> {
+  const token = await getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const file = new File(uri);
+  if (!file.exists) {
+    // The picker's cache file can be swept away by the OS before we send it.
+    throw new ApiError(0, "That file is no longer available — pick or film it again.");
+  }
+
+  // Big videos get room to finish; the fetch path's 20s would cut them off.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10 * 60_000);
+
+  let res: UploadResult;
+  try {
+    res = await file
+      .createUploadTask(`${API_URL}${path}`, {
+        httpMethod: "POST",
+        uploadType: UploadType.MULTIPART,
+        fieldName: "file",
+        mimeType: mime,
+        headers,
+        signal: controller.signal,
+        onProgress: onProgress
+          ? ({ bytesSent, totalBytes }) => {
+              if (totalBytes > 0) {
+                onProgress(Math.min(100, Math.round((bytesSent / totalBytes) * 100)));
+              }
+            }
+          : undefined,
+      })
+      .uploadAsync();
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new ApiError(0, "The upload timed out — check your connection and try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  // Upload tasks resolve for non-2xx too, and an error page may not be JSON.
+  let data: unknown = {};
+  try {
+    data = JSON.parse(res.body);
+  } catch {
+    data = {};
+  }
+  if (res.status < 200 || res.status >= 300) {
+    throw new ApiError(res.status, (data as { error?: string }).error ?? `Upload failed (${res.status})`);
   }
   return data as T;
 }
@@ -293,20 +365,20 @@ export const api = {
     ),
 
   /** Upload a raw "how it's made" clip; the server auto-edits it. */
-  uploadStoryVideo: (itemId: string, uri: string) => {
+  uploadStoryVideo: (itemId: string, uri: string, onProgress?: UploadProgressFn) => {
     const name = uri.split("/").pop() ?? "story.mp4";
     const mime = name.toLowerCase().endsWith(".mov") ? "video/quicktime" : "video/mp4";
-    const form = new FormData();
-    form.append("file", { uri, name, type: mime } as unknown as Blob);
-    return request<{ item: MenuItem; edited: boolean }>(`/api/items/${itemId}/story-video`, {
-      method: "POST",
-      formData: form,
-    });
+    return uploadFile<{ item: MenuItem; edited: boolean }>(
+      `/api/items/${itemId}/story-video`,
+      uri,
+      mime,
+      onProgress
+    );
   },
 
   /* ---------- Uploads ---------- */
 
-  upload: async (uri: string, type: "image" | "video") => {
+  upload: (uri: string, type: "image" | "video", onProgress?: UploadProgressFn) => {
     const name = uri.split("/").pop() ?? (type === "image" ? "photo.jpg" : "video.mp4");
     const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : type === "image" ? "jpg" : "mp4";
     const mime =
@@ -317,10 +389,7 @@ export const api = {
         : ext === "mov"
           ? "video/quicktime"
           : "video/mp4";
-    const form = new FormData();
-    // React Native FormData accepts { uri, name, type } file descriptors
-    form.append("file", { uri, name, type: mime } as unknown as Blob);
-    return request<{ url: string }>("/api/upload", { method: "POST", formData: form });
+    return uploadFile<{ url: string }>("/api/upload", uri, mime, onProgress);
   },
 };
 

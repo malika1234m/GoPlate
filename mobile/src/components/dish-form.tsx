@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ActionSheetIOS,
+  ActivityIndicator,
   Alert,
   Image,
   Platform,
@@ -84,6 +85,22 @@ export function chooseSource(onPick: (source: "camera" | "library") => void) {
   }
 }
 
+/**
+ * Covers a media tile while its file is in flight. A dish film can take a
+ * minute on mobile data, and without visible progress owners assume the app
+ * froze and kill it mid-upload.
+ */
+function UploadOverlay({ label }: { label: string }) {
+  return (
+    <View style={styles.uploadOverlay}>
+      <ActivityIndicator color={colors.accent} />
+      <Text style={styles.uploadText} allowFontScaling={false}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 const SWITCHES: { label: string; key: "isVegetarian" | "isSpicy" | "isAvailable"; icon: GlyphName }[] = [
   { label: "Vegetarian", key: "isVegetarian", icon: "eco" },
   { label: "Spicy", key: "isSpicy", icon: "fire" },
@@ -101,6 +118,7 @@ export function DishForm({
   onRemoveMedia?: (kind: "image" | "video") => void;
 }) {
   const [uploading, setUploading] = useState<"image" | "video" | null>(null);
+  const [progress, setProgress] = useState(0);
 
   const confirmRemove = (kind: "image" | "video") => {
     Alert.alert(
@@ -120,13 +138,17 @@ export function DishForm({
     );
   };
 
-  const addMedia = (kind: "image" | "video") =>
+  const addMedia = (kind: "image" | "video") => {
+    // A second tap while a file is in flight starts a competing upload and the
+    // slower one wins — ignore taps until the current one settles.
+    if (uploading) return;
     chooseSource(async (source) => {
       const uri = await captureMedia(kind, source);
       if (!uri) return;
+      setProgress(0);
       setUploading(kind);
       try {
-        const { url } = await api.upload(uri, kind);
+        const { url } = await api.upload(uri, kind, setProgress);
         onChange(kind === "image" ? { imageUrl: url } : { videoUrl: url });
       } catch (err) {
         Alert.alert("Upload failed", err instanceof Error ? err.message : "Try again");
@@ -134,12 +156,19 @@ export function DishForm({
         setUploading(null);
       }
     });
+  };
+
+  const uploadLabel = progress > 0 && progress < 100 ? `Uploading ${progress}%` : "Uploading…";
 
   return (
     <View>
       {/* Media */}
       <View style={styles.mediaRow}>
-        <Pressable style={styles.mediaBox} onPress={() => addMedia("image")}>
+        <Pressable
+          style={[styles.mediaBox, !!uploading && styles.mediaBoxBusy]}
+          onPress={() => addMedia("image")}
+          disabled={!!uploading}
+        >
           {draft.imageUrl ? (
             <>
               <Image source={{ uri: mediaUrl(draft.imageUrl) }} style={styles.mediaFill} />
@@ -151,12 +180,17 @@ export function DishForm({
             <View style={styles.mediaInner}>
               <Icon name="photo_camera" size={26} color={colors.accent} />
               <Text style={styles.mediaHint} allowFontScaling={false}>
-                {uploading === "image" ? "Uploading…" : "Add photo"}
+                Add photo
               </Text>
             </View>
           )}
+          {uploading === "image" ? <UploadOverlay label={uploadLabel} /> : null}
         </Pressable>
-        <Pressable style={styles.mediaBox} onPress={() => addMedia("video")}>
+        <Pressable
+          style={[styles.mediaBox, !!uploading && styles.mediaBoxBusy]}
+          onPress={() => addMedia("video")}
+          disabled={!!uploading}
+        >
           {draft.videoUrl ? (
             <Pressable style={styles.removeChip} hitSlop={8} onPress={() => confirmRemove("video")}>
               <Icon name="close" size={15} color="#fff" />
@@ -169,13 +203,10 @@ export function DishForm({
               color={draft.videoUrl ? colors.success : colors.sky}
             />
             <Text style={styles.mediaHint} allowFontScaling={false}>
-              {uploading === "video"
-                ? "Uploading…"
-                : draft.videoUrl
-                  ? "Video added\nTap to replace"
-                  : "Film 360° video"}
+              {draft.videoUrl ? "Video added\nTap to replace" : "Film 360° video"}
             </Text>
           </View>
+          {uploading === "video" ? <UploadOverlay label={uploadLabel} /> : null}
         </Pressable>
       </View>
       <Text style={styles.mediaTip}>
@@ -253,8 +284,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
+  mediaBoxBusy: { opacity: 0.9 },
   mediaInner: { alignItems: "center", gap: 6 },
   mediaFill: { width: "100%", height: "100%" },
+  uploadOverlay: {
+    position: "absolute",
+    inset: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(7,7,8,0.82)",
+  },
+  uploadText: { color: colors.text, fontSize: 12.5, fontFamily: font.semibold },
   mediaHint: {
     color: colors.textDim,
     textAlign: "center",

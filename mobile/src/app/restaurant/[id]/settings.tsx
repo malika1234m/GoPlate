@@ -3,9 +3,10 @@ import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Swi
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { api, mediaUrl, API_URL, RestaurantFull } from "@/lib/api";
-import { Button, Card, Chip, Icon, Input, SectionHeader } from "@/components/ui";
+import { Button, Card, Chip, Icon, Input, SectionHeader, Select } from "@/components/ui";
 import { captureMedia, chooseSource } from "@/components/dish-form";
 import { useKeyboardPadding } from "@/lib/keyboard";
+import { currencyOptions } from "@/lib/currencies";
 import { colors, font, radius } from "@/lib/theme";
 
 const ACCENT_PRESETS = [
@@ -55,7 +56,7 @@ export default function Settings() {
 
   const save = async () => {
     if (!/^[A-Za-z]{3}$/.test(restaurant.currency.trim())) {
-      Alert.alert("Check the currency", "Use a 3-letter code like USD, EUR, LKR.");
+      Alert.alert("Pick a currency", "Choose the currency your prices are shown in.");
       return;
     }
     setSaving(true);
@@ -154,12 +155,15 @@ export default function Settings() {
           onChangeText={(v) => set({ phone: v })}
           keyboardType="phone-pad"
         />
-        <Input
+        <Select
           label="Currency"
+          title="Choose your currency"
           value={restaurant.currency}
-          onChangeText={(v) => set({ currency: v.toUpperCase() })}
-          autoCapitalize="characters"
-          hint="ISO code shown next to prices — USD, EUR, GBP…"
+          onChange={(v) => set({ currency: v })}
+          options={currencyOptions(restaurant.currency)}
+          searchable
+          searchPlaceholder="Search currency or code"
+          hint="Shown next to every price on your menu."
         />
       </Card>
 

@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
+  Modal,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -11,6 +13,7 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, font, glyphs, GlyphName, radius } from "@/lib/theme";
 
 /* ---------- Icon (Material Symbols glyph) ---------- */
@@ -156,6 +159,156 @@ export function Input(
       ) : hint ? (
         <Text style={styles.inputHint}>{hint}</Text>
       ) : null}
+    </View>
+  );
+}
+
+/* ---------- Select (dropdown) ---------- */
+
+export type SelectOption = { value: string; label: string; hint?: string };
+
+/**
+ * Tap-to-open list picker. Built from Modal + FlatList rather than a native
+ * picker so it looks identical on both platforms and needs no extra native
+ * module (which would force a new store build instead of an OTA update).
+ */
+export function Select({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder = "Select…",
+  hint,
+  error,
+  title,
+  searchable,
+  searchPlaceholder = "Search…",
+}: {
+  label?: string;
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  hint?: string;
+  error?: string;
+  title?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+}) {
+  const insets = useSafeAreaInsets();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const selected = options.find((o) => o.value === value);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.label.toLowerCase().includes(q) ||
+        o.value.toLowerCase().includes(q) ||
+        (o.hint ?? "").toLowerCase().includes(q)
+    );
+  }, [options, query]);
+
+  const close = () => {
+    setOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <View style={{ marginBottom: 14 }}>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [
+          styles.input,
+          styles.selectField,
+          !!error && { borderColor: colors.danger },
+          pressed && { borderColor: colors.accent },
+        ]}
+      >
+        <Text
+          style={[styles.selectValue, !selected && { color: colors.textFaint }]}
+          numberOfLines={1}
+        >
+          {selected ? selected.label : placeholder}
+        </Text>
+        <Icon name="expand_more" size={20} color={colors.textDim} />
+      </Pressable>
+      {error ? (
+        <Text style={[styles.inputHint, { color: colors.danger }]}>{error}</Text>
+      ) : hint ? (
+        <Text style={styles.inputHint}>{hint}</Text>
+      ) : null}
+
+      <Modal
+        visible={open}
+        transparent
+        animationType="slide"
+        onRequestClose={close}
+        statusBarTranslucent
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={close} />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 12 }]}>
+          <View style={styles.sheetGrabber} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>{title ?? label ?? "Select"}</Text>
+            <Pressable onPress={close} hitSlop={10} style={styles.sheetClose}>
+              <Icon name="close" size={18} color={colors.textDim} />
+            </Pressable>
+          </View>
+
+          {searchable ? (
+            <View style={styles.searchWrap}>
+              <Icon name="search" size={18} color={colors.textFaint} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={searchPlaceholder}
+                placeholderTextColor={colors.textFaint}
+                autoCorrect={false}
+                autoCapitalize="none"
+                style={styles.searchInput}
+              />
+            </View>
+          ) : null}
+
+          <FlatList
+            data={visible}
+            keyExtractor={(o) => o.value}
+            keyboardShouldPersistTaps="handled"
+            style={{ maxHeight: 380 }}
+            ListEmptyComponent={
+              <Text style={styles.sheetEmpty}>No matches. Try a different search.</Text>
+            }
+            renderItem={({ item }) => {
+              const active = item.value === value;
+              return (
+                <Pressable
+                  onPress={() => {
+                    onChange(item.value);
+                    close();
+                  }}
+                  style={({ pressed }) => [
+                    styles.optionRow,
+                    pressed && { backgroundColor: colors.surfaceRaised },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.optionLabel, active && { color: colors.accent }]}>
+                      {item.label}
+                    </Text>
+                    {item.hint ? <Text style={styles.optionHint}>{item.hint}</Text> : null}
+                  </View>
+                  {active ? <Icon name="check" size={19} color={colors.accent} /> : null}
+                </Pressable>
+              );
+            }}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -306,6 +459,90 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 5,
     lineHeight: 17,
+    fontFamily: font.regular,
+  },
+  selectField: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    // Match the TextInput's rendered height so the two line up in a form.
+    paddingVertical: 13,
+  },
+  selectValue: { flex: 1, color: colors.text, fontSize: 15, fontFamily: font.regular },
+  sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderTopWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  sheetGrabber: {
+    alignSelf: "center",
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.borderLight,
+    marginBottom: 12,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  sheetTitle: { flex: 1, color: colors.text, fontSize: 17, fontFamily: font.heavy },
+  sheetClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceRaised,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetEmpty: {
+    color: colors.textFaint,
+    fontSize: 13.5,
+    textAlign: "center",
+    paddingVertical: 26,
+    fontFamily: font.regular,
+  },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 15,
+    fontFamily: font.regular,
+    paddingVertical: 11,
+  },
+  optionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  optionLabel: { color: colors.text, fontSize: 15, fontFamily: font.medium },
+  optionHint: {
+    color: colors.textFaint,
+    fontSize: 12.5,
+    marginTop: 2,
     fontFamily: font.regular,
   },
   card: {

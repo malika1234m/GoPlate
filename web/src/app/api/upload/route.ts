@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "No file provided" }, { status: 400 });
   }
   if (file.size > MAX_BYTES) {
-    return Response.json({ error: "File too large (max 100 MB)" }, { status: 413 });
+    return Response.json({ error: "File too large (max 200 MB)" }, { status: 413 });
   }
 
   let ext = ALLOWED[file.type];

@@ -31,6 +31,7 @@ export default function EditDish() {
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [uploadingStory, setUploadingStory] = useState(false);
+  const [storyProgress, setStoryProgress] = useState(0);
   const [progress, setProgress] = useState<number | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const keyboardPad = useKeyboardPadding();
@@ -145,13 +146,15 @@ export default function EditDish() {
       .then(({ item }) => setItem(item))
       .catch(() => {});
 
-  const addStoryVideo = () =>
+  const addStoryVideo = () => {
+    if (uploadingStory) return;
     chooseSource(async (source) => {
       const uri = await captureMedia("video", source);
       if (!uri) return;
+      setStoryProgress(0);
       setUploadingStory(true);
       try {
-        const { item: updated } = await api.uploadStoryVideo(id, uri);
+        const { item: updated } = await api.uploadStoryVideo(id, uri, setStoryProgress);
         setItem(updated);
         Alert.alert(
           "Video ready",
@@ -163,6 +166,7 @@ export default function EditDish() {
         setUploadingStory(false);
       }
     });
+  };
 
   const remove3d = () => {
     Alert.alert(
@@ -294,6 +298,13 @@ export default function EditDish() {
           loading={uploadingStory}
           style={{ marginTop: 14 }}
         />
+        {uploadingStory ? (
+          <Text style={styles.uploadNote}>
+            {storyProgress > 0 && storyProgress < 100
+              ? `Sending your clip — ${storyProgress}%. Keep the app open.`
+              : "Editing your video on our side. This can take a minute — keep the app open."}
+          </Text>
+        ) : null}
         {item.storyVideoUrl ? (
           <Button
             title="Remove video"
@@ -351,6 +362,14 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 12,
     fontFamily: font.regular,
+  },
+  uploadNote: {
+    color: colors.textDim,
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 10,
+    textAlign: "center",
+    fontFamily: font.medium,
   },
   progressTrack: {
     height: 6,
