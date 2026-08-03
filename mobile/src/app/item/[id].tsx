@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, MenuItem } from "@/lib/api";
@@ -7,6 +7,7 @@ import { handleUpgradeError } from "@/lib/upgrade";
 import { currencySymbol } from "@/lib/currencies";
 import { useKeyboardPadding } from "@/lib/keyboard";
 import { Badge, BadgeTone, Button, Card, IconCircle } from "@/components/ui";
+import { ScreenLoader } from "@/components/loading-screen";
 import { ModifierEditor } from "@/components/modifier-editor";
 import {
   captureMedia,
@@ -87,12 +88,7 @@ export default function EditDish() {
     return stopPolling;
   }, [id, router, startPolling, stopPolling]);
 
-  if (!item || !draft)
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    );
+  if (!item || !draft) return <ScreenLoader label="Loading dish…" />;
 
   const onChange = (patch: Partial<DishDraft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
 

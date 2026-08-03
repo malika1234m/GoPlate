@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, setToken, User } from "@/lib/api";
 import { useKeyboardPadding } from "@/lib/keyboard";
 import { Button, Card, IconCircle, Input, SectionHeader } from "@/components/ui";
+import { ScreenLoader } from "@/components/loading-screen";
 import { colors, font } from "@/lib/theme";
 
 export default function Account() {
@@ -34,12 +35,7 @@ export default function Account() {
       });
   }, [router]);
 
-  if (!user)
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    );
+  if (!user) return <ScreenLoader label="Loading your account…" />;
 
   const currentError = touched && !current ? "Enter your current password." : "";
   const nextError = touched && next.length < 8 ? "Use at least 8 characters." : "";

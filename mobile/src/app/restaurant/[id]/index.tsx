@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -19,6 +18,7 @@ import { localToday } from "@/lib/upgrade";
 import { useKeyboardPadding } from "@/lib/keyboard";
 import { formatPrice } from "@/lib/currencies";
 import { Badge, BadgeTone, Button, Card, EmptyState, Icon, IconCircle, Chip, Input } from "@/components/ui";
+import { ScreenLoader } from "@/components/loading-screen";
 import { colors, font, GlyphName, radius } from "@/lib/theme";
 
 function statusBadge(item: MenuItem): { text: string; tone: BadgeTone } {
@@ -167,12 +167,7 @@ export default function MenuEditor() {
     ]);
   };
 
-  if (!restaurant)
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    );
+  if (!restaurant) return <ScreenLoader label="Loading your menu…" />;
 
   const onAction = (to: "orders" | "qr" | "preview" | "settings") => {
     if (to === "orders") router.push(`/restaurant/${id}/orders`);

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import { api, mediaUrl, API_URL, RestaurantFull } from "@/lib/api";
 import { Button, Card, Chip, Icon, Input, SectionHeader, Select } from "@/components/ui";
+import { ScreenLoader } from "@/components/loading-screen";
 import { captureMedia, chooseSource } from "@/components/dish-form";
 import { useKeyboardPadding } from "@/lib/keyboard";
 import { currencyOptions } from "@/lib/currencies";
@@ -47,12 +48,7 @@ export default function Settings() {
       });
   }, [id, router]);
 
-  if (!restaurant)
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.accent} size="large" />
-      </View>
-    );
+  if (!restaurant) return <ScreenLoader label="Loading settings…" />;
 
   const set = (patch: Partial<RestaurantFull>) =>
     setRestaurant((r) => (r ? { ...r, ...patch } : r));
