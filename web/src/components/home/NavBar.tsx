@@ -50,10 +50,10 @@ export function NavBar() {
 
   return (
     <nav className="relative">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
         <span className="flex items-center gap-2.5 shrink-0">
           <BrandLogo />
-          <span className="text-[22px] font-extrabold tracking-wide text-ink">
+          <span className="text-[19px] sm:text-[22px] font-extrabold tracking-wide text-ink">
             <span className="text-accent">Go</span>Plate
           </span>
         </span>
@@ -62,7 +62,7 @@ export function NavBar() {
           {NAV.map(([label, href], i) => linkEl(label, href, i))}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href="/login"
             className="hidden sm:inline-block rounded-full border border-white/25 px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold tracking-wide text-ink whitespace-nowrap hover:border-white/50 transition-colors"
@@ -71,10 +71,13 @@ export function NavBar() {
           </Link>
           <Link
             href="/register"
-            className="rounded-full px-5 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-bold tracking-wide text-white whitespace-nowrap"
+            className="rounded-full px-4 sm:px-6 py-2.5 sm:py-3 text-xs sm:text-sm font-bold tracking-wide text-white whitespace-nowrap"
             style={{ background: "linear-gradient(100deg, var(--accent), #f5934f)" }}
           >
-            GET STARTED FREE
+            {/* "FREE" is dropped below sm: the full label plus the logo, burger and
+                gaps needs 371px, which overflows every phone narrower than 419px. */}
+            <span className="sm:hidden">GET STARTED</span>
+            <span className="hidden sm:inline">GET STARTED FREE</span>
           </Link>
           <button
             onClick={() => setOpen((v) => !v)}
@@ -93,6 +96,14 @@ export function NavBar() {
       {open && (
         <div className="lg:hidden absolute left-0 right-0 top-full mt-3 z-50 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-md px-5 py-2">
           {NAV.map(([label, href], i) => linkEl(label, href, i, true))}
+          {/* SIGN IN is hidden below sm in the bar, so it lives here or nowhere */}
+          <Link
+            href="/login"
+            className="block py-3 text-base text-ink-dim hover:text-ink transition-colors sm:hidden"
+            onClick={() => setOpen(false)}
+          >
+            Sign in
+          </Link>
         </div>
       )}
     </nav>

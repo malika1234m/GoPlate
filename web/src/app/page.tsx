@@ -240,11 +240,16 @@ export default async function Home() {
 
         {/* Hero body */}
         <div className="relative flex-1 max-w-[1400px] mx-auto w-full px-6 sm:px-10 flex items-center">
-          <div className="max-w-[620px] py-16 rise">
+          {/* min-w-0: as a flex child this defaults to min-width:auto, so a long
+              unbreakable word ("RESTAURANT") would force the whole row wider than
+              the viewport and drag the buttons off-screen with it. */}
+          <div className="min-w-0 max-w-[620px] py-16 rise">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
               Experience food like never before
             </p>
-            <h1 className="mt-4 font-extrabold uppercase leading-[0.98] text-[15vw] sm:text-7xl lg:text-[92px] text-ink">
+            {/* 12vw, not 15vw: "RESTAURANT" is 6.685em wide in Poppins ExtraBold,
+                so 15vw renders it 100.3vw wide — clipped on every phone. */}
+            <h1 className="mt-4 font-extrabold uppercase leading-[0.98] text-[12vw] sm:text-7xl lg:text-[92px] text-ink">
               3D Restaurant
               <br />
               <span className="text-accent">Menu</span>
@@ -275,9 +280,12 @@ export default async function Home() {
             </div>
 
             {/* Mini features */}
-            <div className="mt-14 flex flex-wrap gap-x-12 gap-y-6">
+            {/* Grid on mobile: three fixed w-40 columns need 576px and even two
+                need 368px, both wider than a phone. Grid columns divide whatever
+                space there is, so they cannot overflow. */}
+            <div className="mt-14 grid grid-cols-3 gap-x-3 gap-y-6 sm:flex sm:flex-wrap sm:gap-x-12">
               {heroFeatures.map((f) => (
-                <div key={f.title} className="flex flex-col items-center text-center gap-2.5 w-40">
+                <div key={f.title} className="flex flex-col items-center text-center gap-2.5 w-full sm:w-40">
                   <CircleIcon>{f.icon}</CircleIcon>
                   <div>
                     <p className="text-sm font-semibold text-ink">{f.title}</p>
