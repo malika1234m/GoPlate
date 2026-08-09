@@ -15,7 +15,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://goplate.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://goplate.app"
       },
       "channel": "preview"
     },
@@ -25,7 +25,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://goplate.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://goplate.app"
       },
       "channel": "production"
     }
