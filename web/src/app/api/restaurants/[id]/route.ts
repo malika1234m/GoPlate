@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getAuthUser, unauthorized } from "@/lib/auth";
+import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
 import { accessExpired } from "@/lib/plans";
 
 type Params = { params: Promise<{ id: string }> };
@@ -14,7 +14,7 @@ async function ownedRestaurant(req: Request, id: string) {
 export async function GET(req: Request, { params }: Params) {
   const { id } = await params;
   const restaurant = await ownedRestaurant(req, id);
-  if (!restaurant) return unauthorized();
+  if (!restaurant) return notFound();
   const full = await prisma.restaurant.findUnique({
     where: { id },
     include: {
@@ -60,7 +60,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const expired = accessExpired(user);
   if (expired) return expired;
   const restaurant = await ownedRestaurant(req, id);
-  if (!restaurant) return unauthorized();
+  if (!restaurant) return notFound();
 
   const body = await req.json().catch(() => null);
   const parsed = updateSchema.safeParse(body);
@@ -77,7 +77,7 @@ export async function PATCH(req: Request, { params }: Params) {
 export async function DELETE(req: Request, { params }: Params) {
   const { id } = await params;
   const restaurant = await ownedRestaurant(req, id);
-  if (!restaurant) return unauthorized();
+  if (!restaurant) return notFound();
   await prisma.restaurant.delete({ where: { id } });
   return Response.json({ ok: true });
 }

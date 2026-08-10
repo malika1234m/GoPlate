@@ -139,7 +139,11 @@ function mediaTabs(item: PublicItem): MediaTab[] {
   if (has3D(item)) tabs.push("3d");
   if (item.storyVideoUrl) tabs.push("story");
   if (item.videoUrl) tabs.push("spin");
-  if (tabs.length === 0 && item.imageUrl) tabs.push("photo");
+  // The photo is always offered when one exists. It used to be added only as a
+  // last resort (`tabs.length === 0`), which meant a dish with a model or a video
+  // silently dropped its photo — reachable only as the video poster thumbnail.
+  // It stays last so richer media still opens by default.
+  if (item.imageUrl) tabs.push("photo");
   return tabs;
 }
 

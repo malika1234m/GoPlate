@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
 import { prisma } from "@/lib/db";
-import { getAuthUser, unauthorized } from "@/lib/auth";
+import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: Params) {
   const restaurant = await prisma.restaurant.findFirst({
     where: { id, ownerId: user.id },
   });
-  if (!restaurant) return unauthorized();
+  if (!restaurant) return notFound();
 
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const menuUrl = `${base}/r/${restaurant.slug}`;

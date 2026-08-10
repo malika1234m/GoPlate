@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getAuthUser, unauthorized } from "@/lib/auth";
+import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
 import { PLANS, planOf, upgradeRequired, countVideos, withinLimit, accessExpired } from "@/lib/plans";
 
 type Params = { params: Promise<{ id: string }> };
@@ -38,7 +38,7 @@ function today(): string {
 export async function GET(req: Request, { params }: Params) {
   const { id } = await params;
   const item = await ownedItem(req, id);
-  if (!item) return unauthorized();
+  if (!item) return notFound();
   const full = await prisma.menuItem.findUnique({
     where: { id },
     include: {
@@ -61,7 +61,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const expired = accessExpired(user);
   if (expired) return expired;
   const item = await ownedItem(req, id);
-  if (!item) return unauthorized();
+  if (!item) return notFound();
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
@@ -106,7 +106,7 @@ export async function PATCH(req: Request, { params }: Params) {
 export async function DELETE(req: Request, { params }: Params) {
   const { id } = await params;
   const item = await ownedItem(req, id);
-  if (!item) return unauthorized();
+  if (!item) return notFound();
   await prisma.menuItem.delete({ where: { id } });
   return Response.json({ ok: true });
 }

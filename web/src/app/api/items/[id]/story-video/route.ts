@@ -2,7 +2,7 @@ import { mkdir, writeFile, unlink } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
-import { getAuthUser, unauthorized } from "@/lib/auth";
+import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
 import { autoEditVideo } from "@/lib/video";
 import { uploadsDir } from "@/lib/uploads";
 import { PLANS, planOf, upgradeRequired, countVideos, withinLimit, accessExpired } from "@/lib/plans";
@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: Params) {
   const item = await prisma.menuItem.findFirst({
     where: { id, restaurant: { ownerId: user.id } },
   });
-  if (!item) return unauthorized();
+  if (!item) return notFound();
 
   const plan = PLANS[planOf(user)];
   if (plan.maxVideos === 0) {
@@ -97,7 +97,7 @@ export async function DELETE(req: Request, { params }: Params) {
   const item = await prisma.menuItem.findFirst({
     where: { id, restaurant: { ownerId: user.id } },
   });
-  if (!item) return unauthorized();
+  if (!item) return notFound();
   const updated = await prisma.menuItem.update({
     where: { id },
     data: { storyVideoUrl: "" },

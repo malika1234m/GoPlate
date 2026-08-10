@@ -28,7 +28,7 @@ export function setToken(t: string | null) {
 
 async function req<T>(
   path: string,
-  opts: { method?: string; body?: unknown; form?: FormData } = {}
+  opts: { method?: string; body?: unknown; form?: FormData; background?: boolean } = {}
 ): Promise<T> {
   const headers: Record<string, string> = {};
   const t = getToken();
@@ -41,7 +41,13 @@ async function req<T>(
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (res.status === 401 && t && typeof window !== "undefined" && !path.includes("/auth/")) {
+    // Only a genuine authentication failure ends the session. The API used to
+    // answer "row not found / not yours" with a bare 401 too, so opening a
+    // deleted dish signed the owner out; `code` now separates the two.
+    // Background pollers never redirect — a blip on a 15s timer must not throw
+    // the owner out of a page they're working in.
+    const authFailed = res.status === 401 && data.code !== "not_found";
+    if (authFailed && t && typeof window !== "undefined" && !path.includes("/auth/") && !opts.background) {
       setToken(null);
       window.location.href = "/login";
     }
@@ -200,7 +206,9 @@ export const api = {
   ) => req<{ group: ModifierGroup }>(`/api/modifier-groups/${id}`, { method: "PATCH", body }),
   deleteModifierGroup: (id: string) => req<{ ok: boolean }>(`/api/modifier-groups/${id}`, { method: "DELETE" }),
 
-  listOrders: (rid: string) => req<{ orders: Order[] }>(`/api/restaurants/${rid}/orders`),
+  /** `background` for the 15s kitchen poll: a failed tick must never sign the owner out. */
+  listOrders: (rid: string, background = false) =>
+    req<{ orders: Order[] }>(`/api/restaurants/${rid}/orders`, { background }),
   updateOrder: (id: string, status: Order["status"]) =>
     req<{ order: { id: string; status: string } }>(`/api/orders/${id}`, { method: "PATCH", body: { status } }),
 

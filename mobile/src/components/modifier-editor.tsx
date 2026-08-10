@@ -36,19 +36,31 @@ function toInput(d: Draft): ModifierGroupInput | string {
   return { name: d.name.trim(), type: d.type, required: d.required, options };
 }
 
-/** "Options & add-ons" editor: sizes, toppings, spice levels with price deltas. */
+/**
+ * "Options & add-ons" editor: sizes, toppings, spice levels with price deltas.
+ *
+ * On a dish that doesn't exist yet `itemId` is undefined: groups can't be POSTed
+ * (the API keys them to an item id), so they're handed back through
+ * `onStagedChange` and written by the caller once the dish has been created.
+ */
 export function ModifierEditor({
   itemId,
   groups,
+  staged = [],
+  onStagedChange,
   currencySymbol,
   onChanged,
 }: {
-  itemId: string;
+  itemId?: string;
   groups: ModifierGroup[];
+  staged?: ModifierGroupInput[];
+  onStagedChange?: (groups: ModifierGroupInput[]) => void;
   currencySymbol: string;
   onChanged: () => void;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
+  // Index of the staged group being edited, or null when adding a new one.
+  const [stagedIndex, setStagedIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -56,6 +68,16 @@ export function ModifierEditor({
     const input = toInput(draft);
     if (typeof input === "string") {
       Alert.alert("Almost there", input);
+      return;
+    }
+    if (!itemId) {
+      onStagedChange?.(
+        stagedIndex === null
+          ? [...staged, input]
+          : staged.map((g, i) => (i === stagedIndex ? input : g))
+      );
+      setDraft(null);
+      setStagedIndex(null);
       return;
     }
     setSaving(true);
@@ -92,6 +114,24 @@ export function ModifierEditor({
     ]);
   };
 
+  /** Staged groups exist only on this screen — nothing to delete server-side. */
+  const removeStaged = (index: number) => {
+    Alert.alert("Remove option group", `Remove “${staged[index].name}” and its choices?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: () => {
+          onStagedChange?.(staged.filter((_, i) => i !== index));
+          if (stagedIndex === index) {
+            setDraft(null);
+            setStagedIndex(null);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <Card style={{ marginTop: 16, padding: 16 }}>
       <Text style={styles.title}>Options & add-ons</Text>
@@ -116,6 +156,43 @@ export function ModifierEditor({
             </Text>
           </Pressable>
           <Pressable onPress={() => remove(g)} hitSlop={8} style={styles.deleteBtn}>
+            <Icon name="delete" size={16} color={colors.danger} />
+          </Pressable>
+        </View>
+      ))}
+
+      {/* Groups queued on an unsaved dish — written as soon as it's created. */}
+      {staged.map((g, i) => (
+        <View key={`staged-${i}`} style={styles.groupRow}>
+          <Pressable
+            style={{ flex: 1 }}
+            onPress={() => {
+              setStagedIndex(i);
+              setDraft({
+                name: g.name,
+                type: g.type,
+                required: g.required,
+                options: g.options.map((o) => ({
+                  name: o.name,
+                  priceDelta: o.priceDelta ? String(o.priceDelta) : "",
+                })),
+              });
+            }}
+          >
+            <Text style={styles.groupName}>
+              {g.name}{" "}
+              <Text style={styles.groupMeta}>
+                · {g.type === "single" ? "pick one" : "pick any"}
+                {g.required ? " · required" : ""}
+              </Text>
+            </Text>
+            <Text style={styles.groupOptions} numberOfLines={1}>
+              {g.options
+                .map((o) => (o.priceDelta ? `${o.name} +${currencySymbol}${o.priceDelta}` : o.name))
+                .join(", ")}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => removeStaged(i)} hitSlop={8} style={styles.deleteBtn}>
             <Icon name="delete" size={16} color={colors.danger} />
           </Pressable>
         </View>
@@ -200,7 +277,15 @@ export function ModifierEditor({
           </Pressable>
 
           <View style={{ flexDirection: "row", gap: 10 }}>
-            <Button title="Cancel" variant="ghost" style={{ flex: 1 }} onPress={() => setDraft(null)} />
+            <Button
+              title="Cancel"
+              variant="ghost"
+              style={{ flex: 1 }}
+              onPress={() => {
+                setDraft(null);
+                setStagedIndex(null);
+              }}
+            />
             <Button title="Save options" style={{ flex: 1 }} onPress={save} loading={saving} />
           </View>
         </View>
@@ -209,7 +294,10 @@ export function ModifierEditor({
           title="Add option group"
           icon="add"
           variant="secondary"
-          onPress={() => setDraft(emptyDraft())}
+          onPress={() => {
+            setStagedIndex(null);
+            setDraft(emptyDraft());
+          }}
           style={{ marginTop: 10 }}
         />
       )}

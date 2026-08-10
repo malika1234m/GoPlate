@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getAuthUser, unauthorized } from "@/lib/auth";
+import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
 import { accessExpired } from "@/lib/plans";
 
 type Params = { params: Promise<{ id: string }> };
@@ -29,7 +29,7 @@ export async function PATCH(req: Request, { params }: Params) {
   if (expired) return expired;
   const { id } = await params;
   const category = await ownedCategory(req, id);
-  if (!category) return unauthorized();
+  if (!category) return notFound();
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
@@ -46,7 +46,7 @@ export async function PATCH(req: Request, { params }: Params) {
 export async function DELETE(req: Request, { params }: Params) {
   const { id } = await params;
   const category = await ownedCategory(req, id);
-  if (!category) return unauthorized();
+  if (!category) return notFound();
   await prisma.category.delete({ where: { id } });
   return Response.json({ ok: true });
 }

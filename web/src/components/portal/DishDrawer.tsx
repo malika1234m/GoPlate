@@ -7,8 +7,16 @@ import { Btn, Confirm, ErrorNote, Field, inputCls, Modal } from "@/components/po
 /**
  * Create/edit a dish. Text fields save on "Save dish"; media, 3D, sold-out
  * and option groups act immediately (same model as the mobile app).
- * Story video, 3D and option groups need a saved dish first.
+ * Story video and 3D need a saved dish first. Option groups do not: on a new
+ * dish they're staged as `DraftGroup`s and written once the item has an id.
  */
+export type DraftGroup = {
+  name: string;
+  type: string;
+  required: boolean;
+  options: { name: string; priceDelta: number }[];
+};
+
 export function DishDrawer({
   restaurantId,
   categoryId,
@@ -42,7 +50,12 @@ export function DishDrawer({
   const [confirm, setConfirm] = useState<null | { title: string; body: string; label: string; run: () => Promise<void> }>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [modifierModal, setModifierModal] = useState<null | { group?: ModifierGroup }>(null);
+  const [modifierModal, setModifierModal] = useState<null | { group?: ModifierGroup; draftIndex?: number }>(null);
+
+  // Option groups for a dish that doesn't exist yet. The API keys groups to an
+  // item id, so on a new dish they're held here and POSTed straight after the
+  // item is created.
+  const [draftGroups, setDraftGroups] = useState<DraftGroup[]>([]);
 
   const photoInput = useRef<HTMLInputElement | null>(null);
   const videoInput = useRef<HTMLInputElement | null>(null);
@@ -167,8 +180,30 @@ export function DishDrawer({
       videoUrl,
     };
     try {
-      if (current) await api.updateItem(current.id, body);
-      else await api.createItem(restaurantId, { categoryId, ...body });
+      if (current) {
+        await api.updateItem(current.id, body);
+      } else {
+        const { item: created } = await api.createItem(restaurantId, { categoryId, ...body });
+        // Groups can only be attached once the dish has an id. If one fails we
+        // keep the drawer open on the created dish rather than closing, so the
+        // owner can see which groups landed instead of silently losing them.
+        for (let i = 0; i < draftGroups.length; i++) {
+          try {
+            await api.createModifierGroup(created.id, draftGroups[i]);
+          } catch (err) {
+            setCurrent(created);
+            setDraftGroups(draftGroups.slice(i));
+            await onChanged();
+            setError(
+              err instanceof Error
+                ? `Dish saved, but "${draftGroups[i].name}" didn't: ${err.message}`
+                : `Dish saved, but "${draftGroups[i].name}" didn't save.`
+            );
+            setBusy(false);
+            return;
+          }
+        }
+      }
       await onChanged();
       onClose();
     } catch (err) {
@@ -283,7 +318,7 @@ export function DishDrawer({
                 </>
               ) : (
                 <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-navy-700 p-3 text-center text-[11px] text-ink-faint">
-                  Save the dish first to add a “How it&apos;s made” video, options, and 3D
+                  Save the dish first to add a “How it&apos;s made” video and 3D
                 </div>
               )}
             </div>
@@ -318,40 +353,57 @@ export function DishDrawer({
           </div>
         )}
 
-        {/* Option groups */}
-        {current && (
-          <div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint">Options (size, toppings…)</p>
-              <Btn small variant="secondary" onClick={() => setModifierModal({})}>+ Add group</Btn>
-            </div>
-            <div className="mt-2 space-y-2">
-              {(current.modifierGroups ?? []).map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setModifierModal({ group: g })}
-                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-navy-700 bg-navy-900 px-4 py-3 text-left hover:border-accent/60"
-                >
-                  <span>
-                    <span className="text-sm font-bold text-ink">{g.name}</span>
-                    <span className="ml-2 text-xs text-ink-faint">
-                      {g.type === "single" ? "pick one" : "pick any"}{g.required ? " · required" : ""}
-                    </span>
-                  </span>
-                  <span className="truncate text-xs text-ink-faint">
-                    {g.options.map((o) => o.name).join(" · ")}
-                  </span>
-                </button>
-              ))}
-              {(current.modifierGroups ?? []).length === 0 && (
-                <p className="rounded-xl border border-dashed border-navy-700 px-4 py-3 text-xs text-ink-faint">
-                  No option groups yet — add “Size” or “Toppings” and customers pick when ordering.
-                </p>
-              )}
-            </div>
+        {/* Option groups — available on a new dish too; drafts are saved with it. */}
+        <div>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wider text-ink-faint">Options (size, toppings…)</p>
+            <Btn small variant="secondary" onClick={() => setModifierModal({})}>+ Add group</Btn>
           </div>
-        )}
+          <div className="mt-2 space-y-2">
+            {current
+              ? (current.modifierGroups ?? []).map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setModifierModal({ group: g })}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-navy-700 bg-navy-900 px-4 py-3 text-left hover:border-accent/60"
+                  >
+                    <span>
+                      <span className="text-sm font-bold text-ink">{g.name}</span>
+                      <span className="ml-2 text-xs text-ink-faint">
+                        {g.type === "single" ? "pick one" : "pick any"}{g.required ? " · required" : ""}
+                      </span>
+                    </span>
+                    <span className="truncate text-xs text-ink-faint">
+                      {g.options.map((o) => o.name).join(" · ")}
+                    </span>
+                  </button>
+                ))
+              : draftGroups.map((g, i) => (
+                  <button
+                    key={`draft-${i}`}
+                    type="button"
+                    onClick={() => setModifierModal({ draftIndex: i })}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-navy-700 bg-navy-900 px-4 py-3 text-left hover:border-accent/60"
+                  >
+                    <span>
+                      <span className="text-sm font-bold text-ink">{g.name}</span>
+                      <span className="ml-2 text-xs text-ink-faint">
+                        {g.type === "single" ? "pick one" : "pick any"}{g.required ? " · required" : ""}
+                      </span>
+                    </span>
+                    <span className="truncate text-xs text-ink-faint">
+                      {g.options.map((o) => o.name).join(" · ")}
+                    </span>
+                  </button>
+                ))}
+            {(current ? (current.modifierGroups ?? []).length : draftGroups.length) === 0 && (
+              <p className="rounded-xl border border-dashed border-navy-700 px-4 py-3 text-xs text-ink-faint">
+                No option groups yet — add “Size” or “Toppings” and customers pick when ordering.
+              </p>
+            )}
+          </div>
+        </div>
 
         <ErrorNote message={error} />
 
@@ -401,10 +453,23 @@ export function DishDrawer({
         />
       )}
 
-      {modifierModal && current && (
+      {modifierModal && (
         <ModifierModal
-          itemId={current.id}
+          itemId={current?.id}
           group={modifierModal.group}
+          draft={modifierModal.draftIndex !== undefined ? draftGroups[modifierModal.draftIndex] : undefined}
+          onStage={(g) =>
+            setDraftGroups((prev) =>
+              modifierModal.draftIndex !== undefined
+                ? prev.map((p, i) => (i === modifierModal.draftIndex ? g : p))
+                : [...prev, g]
+            )
+          }
+          onRemoveDraft={
+            modifierModal.draftIndex !== undefined
+              ? () => setDraftGroups((prev) => prev.filter((_, i) => i !== modifierModal.draftIndex))
+              : undefined
+          }
           onClose={() => setModifierModal(null)}
           onChanged={async () => {
             await refreshItem();
@@ -483,19 +548,27 @@ function MediaTile({
 function ModifierModal({
   itemId,
   group,
+  draft,
+  onStage,
+  onRemoveDraft,
   onClose,
   onChanged,
 }: {
-  itemId: string;
+  /** Undefined while the dish is unsaved — the group is staged instead of POSTed. */
+  itemId?: string;
   group?: ModifierGroup;
+  draft?: DraftGroup;
+  onStage: (g: DraftGroup) => void;
+  onRemoveDraft?: () => void;
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
-  const [name, setName] = useState(group?.name ?? "");
-  const [type, setType] = useState(group?.type ?? "single");
-  const [required, setRequired] = useState(group?.required ?? false);
+  const existing = group ?? draft;
+  const [name, setName] = useState(existing?.name ?? "");
+  const [type, setType] = useState(existing?.type ?? "single");
+  const [required, setRequired] = useState(existing?.required ?? false);
   const [options, setOptions] = useState<{ name: string; priceDelta: string }[]>(
-    group?.options.map((o) => ({ name: o.name, priceDelta: String(o.priceDelta) })) ?? [
+    existing?.options.map((o) => ({ name: o.name, priceDelta: String(o.priceDelta) })) ?? [
       { name: "", priceDelta: "0" },
       { name: "", priceDelta: "0" },
     ]
@@ -517,6 +590,12 @@ function ModifierModal({
     setBusy(true);
     try {
       const body = { name: name.trim(), type, required, options: clean };
+      if (!itemId) {
+        // Dish isn't saved yet — hold the group and let "Add dish" persist it.
+        onStage(body);
+        onClose();
+        return;
+      }
       if (group) await api.updateModifierGroup(group.id, body);
       else await api.createModifierGroup(itemId, body);
       await onChanged();
@@ -609,6 +688,9 @@ function ModifierModal({
         <div className="flex items-center justify-between gap-3 pt-2">
           {group ? (
             <Btn variant="danger" small onClick={() => setConfirmDelete(true)}>Delete group</Btn>
+          ) : onRemoveDraft ? (
+            // Staged group: nothing to delete server-side, just drop it.
+            <Btn variant="danger" small onClick={() => { onRemoveDraft(); onClose(); }}>Remove group</Btn>
           ) : <span />}
           <div className="flex gap-3">
             <Btn variant="secondary" onClick={onClose}>Cancel</Btn>

@@ -31,9 +31,9 @@ export function OrdersTab({
   const [cancelling, setCancelling] = useState<Order | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (background = true) => {
     try {
-      const { orders } = await api.listOrders(restaurantId);
+      const { orders } = await api.listOrders(restaurantId, background);
       setOrders(orders);
     } catch {
       // polling retries; don't spam errors

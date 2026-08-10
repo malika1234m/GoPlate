@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getAuthUser, unauthorized } from "@/lib/auth";
+import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
 import { gen3dEnabled, startGeneration, checkGeneration } from "@/lib/gen3d";
 import { saveFromUrl } from "@/lib/uploads";
 import { PLANS, planOf, upgradeRequired, countModels, withinLimit, accessExpired } from "@/lib/plans";
@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: Params) {
   const expired = accessExpired(user);
   if (expired) return expired;
   const item = await ownedItem(req, id);
-  if (!item) return unauthorized();
+  if (!item) return notFound();
 
   const plan = PLANS[planOf(user)];
   if (plan.maxModels === 0) {
@@ -83,7 +83,7 @@ export async function POST(req: Request, { params }: Params) {
 export async function GET(req: Request, { params }: Params) {
   const { id } = await params;
   const item = await ownedItem(req, id);
-  if (!item) return unauthorized();
+  if (!item) return notFound();
 
   if (item.modelStatus !== "PROCESSING" || !item.modelJobId) {
     return Response.json({ item });
@@ -123,7 +123,7 @@ export async function GET(req: Request, { params }: Params) {
 export async function DELETE(req: Request, { params }: Params) {
   const { id } = await params;
   const item = await ownedItem(req, id);
-  if (!item) return unauthorized();
+  if (!item) return notFound();
 
   const updated = await prisma.menuItem.update({
     where: { id },

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { getAuthUser, unauthorized } from "@/lib/auth";
+import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -17,7 +17,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const order = await prisma.order.findFirst({
     where: { id, restaurant: { ownerId: user.id } },
   });
-  if (!order) return unauthorized();
+  if (!order) return notFound();
 
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);

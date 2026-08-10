@@ -45,6 +45,20 @@ export async function getAuthUser(req: Request) {
   return user;
 }
 
+/**
+ * The caller isn't authenticated — no token, expired, or revoked. Clients treat
+ * this as "sign in again", so it must NOT be used for "this row isn't yours or
+ * doesn't exist": that used to sign owners out whenever they opened a deleted
+ * dish. Use `notFound()` for those.
+ */
 export function unauthorized() {
-  return Response.json({ error: "Unauthorized" }, { status: 401 });
+  return Response.json({ error: "Unauthorized", code: "unauthenticated" }, { status: 401 });
+}
+
+/**
+ * The resource doesn't exist, or belongs to someone else. Deliberately the same
+ * response for both so it can't be used to probe which ids exist.
+ */
+export function notFound() {
+  return Response.json({ error: "Not found", code: "not_found" }, { status: 404 });
 }
