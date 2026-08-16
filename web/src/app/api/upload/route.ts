@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { getAuthUser, unauthorized } from "@/lib/auth";
 import { accessExpired } from "@/lib/plans";
 import { uploadsDir } from "@/lib/uploads";
+import { optimizeGlb } from "@/lib/model-optimize";
 
 /**
  * Media upload (dish photos and videos) from the mobile app.
@@ -57,7 +58,11 @@ export async function POST(req: Request) {
   const dir = uploadsDir();
   await mkdir(dir, { recursive: true });
   const filename = `${crypto.randomBytes(12).toString("hex")}${ext}`;
-  await writeFile(path.join(dir, filename), Buffer.from(await file.arrayBuffer()));
+  let bytes: Uint8Array = Buffer.from(await file.arrayBuffer());
+  // A hand-uploaded model gets the same treatment as a generated one — an
+  // owner exporting from Blender or Meshy has no reason to know about Draco.
+  if (ext === ".glb") bytes = await optimizeGlb(bytes);
+  await writeFile(path.join(dir, filename), bytes);
 
   return Response.json({ url: `/uploads/${filename}` }, { status: 201 });
 }

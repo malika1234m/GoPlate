@@ -3,7 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // ffmpeg-static resolves its binary path from __dirname at runtime;
   // it must stay an external require, not be inlined into the server bundle.
-  serverExternalPackages: ["ffmpeg-static"],
+  // draco3dgltf and sharp load native/wasm binaries from their own package
+  // directories for the same reason — bundling breaks those lookups.
+  serverExternalPackages: ["ffmpeg-static", "draco3dgltf", "sharp"],
 
   // goplate.app is the canonical host: QR codes and printed cards carry it, so
   // www must not serve a second copy of the site. 301 rather than `permanent:

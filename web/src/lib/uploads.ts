@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import { optimizeGlb } from "./model-optimize";
 
 /**
  * Where uploaded media lives. Defaults to ./uploads for local dev; set
@@ -23,8 +24,11 @@ export async function saveFromUrl(url: string, ext: string): Promise<string> {
   // Reject oversized files before buffering when the server declares a size.
   const declared = Number(res.headers.get("content-length") ?? 0);
   if (declared > MAX_FETCH_BYTES) throw new Error("Downloaded file too large");
-  const buf = Buffer.from(await res.arrayBuffer());
+  let buf: Uint8Array = Buffer.from(await res.arrayBuffer());
   if (buf.byteLength > MAX_FETCH_BYTES) throw new Error("Downloaded file too large");
+  // Only the GLB is worth shrinking. USDZ is iOS Quick Look's own container:
+  // Draco doesn't apply to it and there is no Node tooling to repack it.
+  if (ext === ".glb") buf = await optimizeGlb(buf);
   const dir = uploadsDir();
   await mkdir(dir, { recursive: true });
   const name = `model-${crypto.randomBytes(12).toString("hex")}${ext}`;
