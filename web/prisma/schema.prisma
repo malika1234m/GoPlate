@@ -11,7 +11,12 @@ datasource db {
 model User {
   id                   String               @id @default(cuid())
   email                String               @unique
-  passwordHash         String
+  // Null for accounts created with "Continue with Google" — they have no
+  // password until they set one through the forgot-password flow.
+  passwordHash         String?
+  // Google's stable subject id. Set once the account is created with or
+  // linked to Google; never reuse the email for this, Google can't change subs.
+  googleId             String?              @unique
   name                 String
   plan                 String               @default("free") // free | pro
   tokenVersion         Int                  @default(0) // bump to revoke all existing sessions

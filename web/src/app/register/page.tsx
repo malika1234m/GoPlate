@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { RegisterClient } from "@/components/portal/RegisterClient";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function RegisterPage() {
-  return <RegisterClient />;
+  // useSearchParams (?step=restaurant, set by Google sign-up) needs Suspense.
+  return (
+    <Suspense fallback={null}>
+      <RegisterClient />
+    </Suspense>
+  );
 }

@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/portal";
 import { Btn, CurrencySelect, ErrorNote, Field, FieldError, inputCls } from "@/components/portal/ui";
+import { AuthDivider, GoogleButton, googleSignInAvailable } from "@/components/portal/GoogleButton";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -15,7 +16,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
  */
 export function RegisterClient() {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2>(1);
+  // Set when sign-up happened on the sign-in page through Google: the account
+  // exists and is signed in, only the restaurant is missing.
+  const fromGoogle = useSearchParams().get("step") === "restaurant";
+  const [step, setStep] = useState<1 | 2>(fromGoogle ? 2 : 1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
@@ -34,8 +38,26 @@ export function RegisterClient() {
   const [rCurrency, setRCurrency] = useState("LKR");
 
   useEffect(() => {
-    if (getToken()) router.replace("/dashboard");
-  }, [router]);
+    // Step 2 is reached holding a token by design — only bounce the signed-in
+    // owner away when they land on the account step.
+    if (getToken() && !fromGoogle && step === 1) router.replace("/dashboard");
+  }, [router, fromGoogle, step]);
+
+  const signUpWithGoogle = async (credential: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      const { token, isNew } = await api.googleSignIn(credential);
+      setToken(token);
+      // Already had an account — nothing to set up, go straight in.
+      if (!isNew) router.replace("/dashboard");
+      else setStep(2);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign up with Google.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const validateAccount = (): boolean => {
     const errs: Record<string, string> = {};
@@ -115,6 +137,12 @@ export function RegisterClient() {
               <h1 className="mt-6 text-center text-3xl font-extrabold text-ink">Start your free month</h1>
               <p className="mt-2 text-center text-sm text-ink-dim">Full access for 30 days. No card needed.</p>
               <form onSubmit={submitAccount} className="mt-8 space-y-4 rounded-[24px] border border-navy-700 bg-navy-900 p-7 sm:p-8">
+                {googleSignInAvailable() && (
+                  <>
+                    <GoogleButton onCredential={signUpWithGoogle} text="signup_with" />
+                    <AuthDivider />
+                  </>
+                )}
                 <Field label="Your name">
                   <input required value={name} onChange={(e) => { setName(e.target.value); setFieldErr((f) => ({ ...f, name: "" })); }} placeholder="Alex Chef" className={inputCls} autoComplete="name" aria-invalid={!!fieldErr.name} />
                   <FieldError message={fieldErr.name} />

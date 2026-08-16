@@ -38,6 +38,18 @@ export async function PATCH(req: Request) {
   }
   const { currentPassword, newPassword } = parsed.data;
 
+  // A Google-only account has no current password to check against. Sending it
+  // through the reset flow proves control of the mailbox before one is set.
+  if (!user.passwordHash) {
+    return Response.json(
+      {
+        error: "This account signs in with Google. Use “Forgot password” to set a password first.",
+        code: "use_google",
+      },
+      { status: 400 }
+    );
+  }
+
   if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
     return Response.json({ error: "Current password is incorrect." }, { status: 401 });
   }
@@ -54,7 +66,13 @@ export async function PATCH(req: Request) {
   return Response.json({ ok: true, token });
 }
 
-const deleteSchema = z.object({ password: z.string().min(1) });
+// `confirm` is the escape hatch for Google-only accounts, which have no
+// password to type. Play requires every account to be deletable in-app, so the
+// route can't simply refuse them.
+const deleteSchema = z.object({
+  password: z.string().min(1).optional(),
+  confirm: z.string().optional(),
+});
 
 /**
  * Delete the account and everything it owns (restaurants, menus, dishes —
@@ -72,8 +90,17 @@ export async function DELETE(req: Request) {
   if (!parsed.success) {
     return Response.json({ error: "Enter your password to confirm." }, { status: 400 });
   }
-  if (!(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
-    return Response.json({ error: "Password is incorrect." }, { status: 401 });
+
+  if (user.passwordHash) {
+    const password = parsed.data.password ?? "";
+    if (!password || !(await bcrypt.compare(password, user.passwordHash))) {
+      return Response.json({ error: "Password is incorrect." }, { status: 401 });
+    }
+  } else if (parsed.data.confirm !== "DELETE") {
+    return Response.json(
+      { error: "Type DELETE to confirm.", code: "confirm_required" },
+      { status: 400 }
+    );
   }
 
   await prisma.user.delete({ where: { id: user.id } });

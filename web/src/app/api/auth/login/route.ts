@@ -21,7 +21,21 @@ export async function POST(req: Request) {
   const { email, password } = parsed.data;
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+
+  // Signed up with Google and never set a password. Say so rather than
+  // returning "invalid password" — otherwise the owner retries forever against
+  // a password that was never created.
+  if (user && !user.passwordHash) {
+    return Response.json(
+      {
+        error: "This account signs in with Google. Use “Continue with Google”, or reset your password to set one.",
+        code: "use_google",
+      },
+      { status: 401 }
+    );
+  }
+
+  if (!user?.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
     return Response.json({ error: "Invalid email or password" }, { status: 401 });
   }
 

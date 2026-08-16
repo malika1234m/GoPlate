@@ -149,11 +149,15 @@ export const api = {
     req<{ token: string; user: User }>("/api/auth/register", { body: { name, email, password } }),
   login: (email: string, password: string) =>
     req<{ token: string; user: User }>("/api/auth/login", { body: { email, password } }),
+  /** `isNew` is true only when this Google account had no GoPlate account yet. */
+  googleSignIn: (credential: string) =>
+    req<{ token: string; user: User; isNew: boolean }>("/api/auth/google", { body: { credential } }),
   me: () => req<{ user: User }>("/api/me"),
   changePassword: (currentPassword: string, newPassword: string) =>
     req<{ ok: boolean; token: string }>("/api/me", { method: "PATCH", body: { currentPassword, newPassword } }),
+  /** Google-only accounts have no password: they confirm with the word DELETE. */
   deleteAccount: (password: string) =>
-    req<{ ok: boolean }>("/api/me", { method: "DELETE", body: { password } }),
+    req<{ ok: boolean }>("/api/me", { method: "DELETE", body: { password, confirm: password } }),
 
   billing: () => req<Billing>("/api/billing"),
 

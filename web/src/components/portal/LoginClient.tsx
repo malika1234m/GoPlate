@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/portal";
 import { Btn, ErrorNote, Field, inputCls } from "@/components/portal/ui";
+import { AuthDivider, GoogleButton, googleSignInAvailable } from "@/components/portal/GoogleButton";
 
 export function LoginClient() {
   const router = useRouter();
@@ -21,6 +22,21 @@ export function LoginClient() {
   useEffect(() => {
     if (getToken()) router.replace("/dashboard");
   }, [router]);
+
+  // A first-time Google account still needs a restaurant, so it lands on
+  // sign-up step 2 rather than an empty dashboard.
+  const signInWithGoogle = async (credential: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      const { token, isNew } = await api.googleSignIn(credential);
+      setToken(token);
+      router.replace(isNew ? "/register?step=restaurant" : "/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign in with Google.");
+      setBusy(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +82,12 @@ export function LoginClient() {
           )}
 
           <form onSubmit={submit} className="mt-8 space-y-4 rounded-[24px] border border-navy-700 bg-navy-900 p-7 sm:p-8">
+            {googleSignInAvailable() && (
+              <>
+                <GoogleButton onCredential={signInWithGoogle} text="signin_with" />
+                <AuthDivider />
+              </>
+            )}
             <Field label="Email">
               <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@restaurant.com" className={inputCls} />
             </Field>
