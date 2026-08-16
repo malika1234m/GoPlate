@@ -61,8 +61,10 @@ async function main() {
   const items = [
     ["Starters", "Smashed Guacamole", "Hand-crushed avocado, charred lime, smoked chili flakes, warm tortilla chips.", 8.5, "/demo/guac.svg", { modelUrl: AVOCADO_GLB, modelStatus: "READY", storyVideoUrl: "/demo/story-guac.mp4" }, { caption: "Crushed to order, never before", isVegetarian: true }],
     ["Starters", "Garden Salad", "Heirloom tomatoes, cucumber ribbons, toasted seeds, herb vinaigrette.", 7.0, "/demo/salad.svg", {}, { caption: "Picked this morning", isVegetarian: true }],
-    ["Mains", "Fire-Grilled Burger", "Dry-aged beef, smoked cheddar, burnt-onion mayo, brioche from our oven.", 15.0, "/demo/burger.svg", { storyVideoUrl: "/demo/story-burger.mp4" }, { caption: "Our signature since day one" }],
+    // First in Mains on purpose: it is the only dish with a real 3D model, so
+    // it is what a visitor should meet before anything else on the menu.
     ["Mains", "Charred Ribeye", "Grass-fed ribeye over open flame, rosemary butter, blistered vine tomatoes, crushed herb potatoes.", 28.0, "/demo/steak.svg", { modelUrl: RIBEYE_GLB, modelStatus: "READY" }, { caption: "Rested ten minutes, always" }],
+    ["Mains", "Fire-Grilled Burger", "Dry-aged beef, smoked cheddar, burnt-onion mayo, brioche from our oven.", 15.0, "/demo/burger.svg", { storyVideoUrl: "/demo/story-burger.mp4" }, { caption: "Our signature since day one" }],
     ["Mains", "Wood-Oven Margherita", "San Marzano tomatoes, fior di latte, basil picked this morning.", 13.5, "/demo/pizza.svg", {}, { caption: "90 seconds at 450 degrees", isVegetarian: true }],
     ["Mains", "Midnight Curry", "Slow-simmered coconut curry, charred peppers, jasmine rice.", 14.0, "/demo/curry.svg", { storyVideoUrl: "/demo/story-curry.mp4" }, { caption: "The late-night legend", isSpicy: true }],
     ["Mains", "Cacio e Pepe", "Tonnarelli, aged pecorino, cracked Sarawak pepper. Four ingredients, no shortcuts.", 12.5, "/demo/pasta.svg", {}, { caption: "Four ingredients, no shortcuts", isVegetarian: true }],

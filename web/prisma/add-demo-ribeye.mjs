@@ -17,6 +17,15 @@ if (!restaurant) throw new Error("demo-bistro not found — run prisma/seed.mjs 
 const mains = restaurant.categories.find((c) => c.name === "Mains");
 if (!mains) throw new Error("No 'Mains' category on demo-bistro.");
 
+// First in Mains: it is the only dish with a real 3D model, so it should be the
+// first thing a visitor meets. Items sort by sortOrder ascending, so one below
+// the current minimum wins without having to renumber every other dish.
+const others = await prisma.menuItem.findMany({
+  where: { categoryId: mains.id, name: { not: NAME } },
+  select: { sortOrder: true },
+});
+const topSortOrder = Math.min(0, ...others.map((i) => i.sortOrder)) - 1;
+
 const existing = await prisma.menuItem.findFirst({
   where: { restaurantId: restaurant.id, name: NAME },
 });
@@ -24,14 +33,10 @@ const existing = await prisma.menuItem.findFirst({
 if (existing) {
   await prisma.menuItem.update({
     where: { id: existing.id },
-    data: { modelUrl: MODEL_URL, modelStatus: "READY" },
+    data: { modelUrl: MODEL_URL, modelStatus: "READY", sortOrder: topSortOrder },
   });
-  console.log(`updated: ${NAME}`);
+  console.log(`updated: ${NAME} (sortOrder ${topSortOrder})`);
 } else {
-  // Sits after the burger so Mains still reads sensibly.
-  const burger = await prisma.menuItem.findFirst({
-    where: { restaurantId: restaurant.id, name: "Fire-Grilled Burger" },
-  });
   await prisma.menuItem.create({
     data: {
       name: NAME,
@@ -40,14 +45,14 @@ if (existing) {
       caption: "Rested ten minutes, always",
       price: 28,
       imageUrl: "/demo/steak.svg",
-      sortOrder: (burger?.sortOrder ?? 2) + 1,
+      sortOrder: topSortOrder,
       categoryId: mains.id,
       restaurantId: restaurant.id,
       modelUrl: MODEL_URL,
       modelStatus: "READY",
     },
   });
-  console.log(`created: ${NAME}`);
+  console.log(`created: ${NAME} (sortOrder ${topSortOrder})`);
 }
 
 await prisma.$disconnect();

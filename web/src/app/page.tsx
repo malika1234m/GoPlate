@@ -25,7 +25,11 @@ async function getLiveData() {
       imageUrl: i.imageUrl,
       has3D: i.modelStatus === "READY" && !!i.modelUrl,
     }));
-    const dish3d = demo?.items.find((i) => i.modelStatus === "READY" && i.modelUrl) ?? null;
+    // Prefer a model we generated and host ourselves over an external sample:
+    // the hero is the sales pitch, so it should show what an owner actually
+    // gets from filming a plate, not a stock asset loaded off someone's CDN.
+    const ready = (demo?.items ?? []).filter((i) => i.modelStatus === "READY" && i.modelUrl);
+    const dish3d = ready.find((i) => i.modelUrl.startsWith("/")) ?? ready[0] ?? null;
     return {
       showcase,
       currency: demo?.currency ?? "USD",
