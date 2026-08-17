@@ -35,25 +35,28 @@ declare global {
   }
 }
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
-
 /** Google caps the rendered button at 400px and ignores percentages. */
 const MAX_WIDTH = 400;
 
-export function googleSignInAvailable(): boolean {
-  return CLIENT_ID.length > 0;
-}
-
 /**
  * Renders Google's own "Continue with Google" button and hands the resulting
- * ID token back through `onCredential`. Renders nothing at all when
- * NEXT_PUBLIC_GOOGLE_CLIENT_ID is unset, so the password form is still a
- * complete sign-in on an unconfigured deployment.
+ * ID token back through `onCredential`. Renders nothing when `clientId` is
+ * empty, so the password form is still a complete sign-in on a deployment
+ * where Google sign-in was never configured.
+ *
+ * `clientId` arrives as a prop from the server rather than being read from
+ * process.env here. Reading NEXT_PUBLIC_* in client code inlines the value at
+ * BUILD time, so a deployment whose build came from cache keeps shipping the
+ * old (empty) value even after the variable is set — the server picks the
+ * change up on restart while the browser bundle silently does not. As a prop
+ * it is resolved per request, so setting the variable is enough.
  */
 export function GoogleButton({
+  clientId,
   onCredential,
   text = "continue_with",
 }: {
+  clientId: string;
   onCredential: (credential: string) => void;
   text?: GsiButtonOptions["text"];
 }) {
@@ -70,7 +73,7 @@ export function GoogleButton({
     const el = holder.current;
     if (!el || !window.google) return;
     window.google.accounts.id.initialize({
-      client_id: CLIENT_ID,
+      client_id: clientId,
       callback: (res) => {
         if (res.credential) handler.current(res.credential);
       },
@@ -86,13 +89,13 @@ export function GoogleButton({
       logo_alignment: "left",
       width: Math.min(el.offsetWidth || MAX_WIDTH, MAX_WIDTH),
     });
-  }, [text]);
+  }, [text, clientId]);
 
   useEffect(() => {
     if (ready) draw();
   }, [ready, draw]);
 
-  if (!CLIENT_ID) return null;
+  if (!clientId) return null;
 
   return (
     <>

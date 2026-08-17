@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/portal";
 import { Btn, CurrencySelect, ErrorNote, Field, FieldError, inputCls } from "@/components/portal/ui";
-import { AuthDivider, GoogleButton, googleSignInAvailable } from "@/components/portal/GoogleButton";
+import { AuthDivider, GoogleButton } from "@/components/portal/GoogleButton";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -14,7 +14,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
  * Two-step sign-up, matching the mobile app: 1) the account,
  * 2) the restaurant. Categories come next on the dashboard.
  */
-export function RegisterClient() {
+/** `googleClientId` is resolved on the server; empty means Google is unconfigured. */
+export function RegisterClient({ googleClientId = "" }: { googleClientId?: string }) {
   const router = useRouter();
   // Set when sign-up happened on the sign-in page through Google: the account
   // exists and is signed in, only the restaurant is missing.
@@ -137,9 +138,13 @@ export function RegisterClient() {
               <h1 className="mt-6 text-center text-3xl font-extrabold text-ink">Start your free month</h1>
               <p className="mt-2 text-center text-sm text-ink-dim">Full access for 30 days. No card needed.</p>
               <form onSubmit={submitAccount} className="mt-8 space-y-4 rounded-[24px] border border-navy-700 bg-navy-900 p-7 sm:p-8">
-                {googleSignInAvailable() && (
+                {googleClientId && (
                   <>
-                    <GoogleButton onCredential={signUpWithGoogle} text="signup_with" />
+                    <GoogleButton
+                      clientId={googleClientId}
+                      onCredential={signUpWithGoogle}
+                      text="signup_with"
+                    />
                     <AuthDivider />
                   </>
                 )}

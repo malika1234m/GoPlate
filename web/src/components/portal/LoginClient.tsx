@@ -6,9 +6,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/portal";
 import { Btn, ErrorNote, Field, inputCls } from "@/components/portal/ui";
-import { AuthDivider, GoogleButton, googleSignInAvailable } from "@/components/portal/GoogleButton";
+import { AuthDivider, GoogleButton } from "@/components/portal/GoogleButton";
 
-export function LoginClient() {
+/** `googleClientId` is resolved on the server; empty means Google is unconfigured. */
+export function LoginClient({ googleClientId = "" }: { googleClientId?: string }) {
   const router = useRouter();
   // Set by the reset flow so a finished reset lands on a confirmation, not a
   // bare sign-in form that gives no sign anything happened.
@@ -82,9 +83,13 @@ export function LoginClient() {
           )}
 
           <form onSubmit={submit} className="mt-8 space-y-4 rounded-[24px] border border-navy-700 bg-navy-900 p-7 sm:p-8">
-            {googleSignInAvailable() && (
+            {googleClientId && (
               <>
-                <GoogleButton onCredential={signInWithGoogle} text="signin_with" />
+                <GoogleButton
+                  clientId={googleClientId}
+                  onCredential={signInWithGoogle}
+                  text="signin_with"
+                />
                 <AuthDivider />
               </>
             )}

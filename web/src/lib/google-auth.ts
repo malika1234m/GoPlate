@@ -15,6 +15,12 @@ const GOOGLE_JWKS = createRemoteJWKSet(
 /** Both spellings are valid `iss` values on a Google ID token. */
 const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
 
+/**
+ * Read on the server only — the auth pages pass the value down to the button as
+ * a prop. Keeping the NEXT_PUBLIC_ name is deliberate: it is what the deployment
+ * already sets, and the id is public anyway. It is simply no longer *inlined*,
+ * so changing it needs a restart rather than a rebuild.
+ */
 export function googleClientId(): string {
   return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 }
