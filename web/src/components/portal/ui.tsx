@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { setToken } from "@/lib/portal";
 
 /* ---------- Small shared primitives for the owner portal ---------- */
@@ -67,6 +67,69 @@ export function Field({
 
 export const inputCls =
   "w-full rounded-xl border border-navy-700 bg-navy-800 px-4 py-3 text-sm text-ink outline-none focus:border-accent placeholder:text-ink-faint/60";
+
+/**
+ * Password field with a show/hide toggle.
+ *
+ * Owners type these on phones, where a mistyped character is invisible and the
+ * only feedback is a failed sign-in. Being able to check what you typed removes
+ * most of that guesswork.
+ *
+ * The toggle is a `button type="button"` on purpose — inside a form, a bare
+ * <button> submits it, which would fire a sign-in attempt on every peek.
+ */
+export function PasswordInput({
+  value,
+  onChange,
+  placeholder = "••••••••",
+  autoComplete = "current-password",
+  required,
+  invalid,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  autoComplete?: "current-password" | "new-password";
+  required?: boolean;
+  invalid?: boolean;
+}) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type={shown ? "text" : "password"}
+        autoComplete={autoComplete}
+        required={required}
+        aria-invalid={invalid}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        // Room on the right so long passwords never run under the toggle.
+        className={`${inputCls} pr-12`}
+      />
+      <button
+        type="button"
+        onClick={() => setShown((s) => !s)}
+        aria-label={shown ? "Hide password" : "Show password"}
+        aria-pressed={shown}
+        className="absolute right-1 top-1/2 -translate-y-1/2 rounded-lg p-2.5 text-ink-faint transition-colors hover:text-ink"
+      >
+        {shown ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="m4 20 16-16" />
+          </svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
 
 /** Inline validation message under a field. */
 export function FieldError({ message }: { message?: string }) {

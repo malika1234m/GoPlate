@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/portal";
-import { Btn, CurrencySelect, ErrorNote, Field, FieldError, inputCls } from "@/components/portal/ui";
+import { Btn, CurrencySelect, ErrorNote, Field, FieldError, PasswordInput, inputCls } from "@/components/portal/ui";
 import { AuthDivider, GoogleButton } from "@/components/portal/GoogleButton";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -157,11 +157,24 @@ export function RegisterClient({ googleClientId = "" }: { googleClientId?: strin
                   <FieldError message={fieldErr.email} />
                 </Field>
                 <Field label="Password" hint={fieldErr.password ? undefined : "At least 8 characters."}>
-                  <input type="password" required value={password} onChange={(e) => { setPassword(e.target.value); setFieldErr((f) => ({ ...f, password: "" })); }} placeholder="••••••••" className={inputCls} autoComplete="new-password" aria-invalid={!!fieldErr.password} />
+                  <PasswordInput
+                    value={password}
+                    onChange={(v) => { setPassword(v); setFieldErr((f) => ({ ...f, password: "" })); }}
+                    autoComplete="new-password"
+                    required
+                    invalid={!!fieldErr.password}
+                  />
                   <FieldError message={fieldErr.password} />
                 </Field>
                 <Field label="Confirm password">
-                  <input type="password" required value={confirm} onChange={(e) => { setConfirm(e.target.value); setFieldErr((f) => ({ ...f, confirm: "" })); }} placeholder="Re-enter your password" className={inputCls} autoComplete="new-password" aria-invalid={!!fieldErr.confirm} />
+                  <PasswordInput
+                    value={confirm}
+                    onChange={(v) => { setConfirm(v); setFieldErr((f) => ({ ...f, confirm: "" })); }}
+                    placeholder="Re-enter your password"
+                    autoComplete="new-password"
+                    required
+                    invalid={!!fieldErr.confirm}
+                  />
                   <FieldError message={fieldErr.confirm} />
                 </Field>
                 <ErrorNote message={error} />

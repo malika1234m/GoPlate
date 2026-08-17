@@ -9,9 +9,16 @@ const schema = z.object({ email: z.string().email().toLowerCase() });
 /**
  * Start a password reset.
  *
- * Always answers `{ ok: true }` for a well-formed address, whether or not an
- * account exists — otherwise this endpoint becomes a way to enumerate which
- * restaurant owners are registered.
+ * Answers `{ found: false }` when no account matches, rather than the usual
+ * "if an account exists…" fiction. That fiction is meant to stop this endpoint
+ * being used to enumerate registered owners — but /api/auth/register already
+ * reveals exactly the same thing ("An account with this email already exists")
+ * and cannot do otherwise, since someone signing up has to be told the address
+ * is taken. Staying vague here therefore protects nothing and strands anyone
+ * who mistypes their address on a screen that claims mail is on its way.
+ *
+ * The rate limits below are what actually prevent abuse, and they matter more
+ * now that the answer is truthful.
  */
 export async function POST(req: Request) {
   // Two budgets. The per-IP one only has to stop bulk abuse — it must stay
@@ -44,7 +51,11 @@ export async function POST(req: Request) {
 
   const user = await prisma.user.findUnique({ where: { email } });
 
-  if (user) {
+  if (!user) {
+    return Response.json({ ok: true, found: false });
+  }
+
+  {
     // Any earlier link for this account stops working the moment a new one is
     // issued, so a forwarded old email can't be used later.
     await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
@@ -79,5 +90,5 @@ export async function POST(req: Request) {
     }
   }
 
-  return Response.json({ ok: true });
+  return Response.json({ ok: true, found: true });
 }

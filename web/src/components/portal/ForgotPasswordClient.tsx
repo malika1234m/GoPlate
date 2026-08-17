@@ -10,6 +10,9 @@ export function ForgotPasswordClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
+  // Distinguished from `sent` so a mistyped address gets told so, instead of
+  // being sent to wait for mail that was never sent.
+  const [notFound, setNotFound] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +26,8 @@ export function ForgotPasswordClient() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Something went wrong. Try again.");
-      setSent(true);
+      if (data.found === false) setNotFound(true);
+      else setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
     } finally {
@@ -31,14 +35,66 @@ export function ForgotPasswordClient() {
     }
   };
 
+  if (notFound) {
+    return (
+      <AuthShell
+        title="No account for that email"
+        subtitle={
+          <>
+            We couldn&apos;t find a GoPlate account for{" "}
+            <span className="font-semibold text-ink">{email.trim()}</span>. Check the spelling, or
+            create an account.
+          </>
+        }
+        footer={
+          <Link href="/login" className="font-semibold text-accent">
+            Back to sign in
+          </Link>
+        }
+      >
+        <div className="flex flex-col items-center text-center">
+          <span
+            className="flex h-14 w-14 items-center justify-center rounded-full"
+            style={{ background: "rgba(224,82,63,0.14)" }}
+          >
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef6a58" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7.5v5" />
+              <path d="M12 16.2h.01" />
+            </svg>
+          </span>
+          <p className="mt-5 text-sm leading-relaxed text-ink-dim">
+            If you signed up with a different address, try that one. Owners who use “Continue with
+            Google” may not have a password at all — sign in with Google instead.
+          </p>
+          <div className="mt-5 flex flex-col items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setNotFound(false);
+                setError("");
+              }}
+              className="text-sm font-semibold text-accent"
+            >
+              Try a different email
+            </button>
+            <Link href="/register" className="text-sm font-semibold text-ink-dim hover:text-accent">
+              Create your account — first month free
+            </Link>
+          </div>
+        </div>
+      </AuthShell>
+    );
+  }
+
   if (sent) {
     return (
       <AuthShell
         title="Check your inbox"
         subtitle={
           <>
-            If an account exists for <span className="font-semibold text-ink">{email.trim()}</span>,
-            we&apos;ve sent a link to reset your password.
+            We&apos;ve sent a link to reset your password to{" "}
+            <span className="font-semibold text-ink">{email.trim()}</span>.
           </>
         }
         footer={

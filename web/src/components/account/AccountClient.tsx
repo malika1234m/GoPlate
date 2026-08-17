@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { AuthDivider, GoogleButton } from "@/components/portal/GoogleButton";
+import { PasswordInput } from "@/components/portal/ui";
 
 /**
  * Owner-facing web billing. Subscriptions are handled here (on the web),
@@ -64,7 +66,8 @@ const tick = (
   </svg>
 );
 
-export function AccountClient() {
+/** `googleClientId` is resolved on the server; empty means Google is unconfigured. */
+export function AccountClient({ googleClientId = "" }: { googleClientId?: string }) {
   const [token, setToken] = useState<string | null>(null);
   const [billing, setBilling] = useState<Billing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +127,32 @@ export function AccountClient() {
       await loadBilling(data.token);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in.");
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
+  /**
+   * Google sign-in for the billing page. Without it an owner who signed up with
+   * Google could never reach their own subscription: they have no password, so
+   * the form above can only ever reject them.
+   */
+  const signInWithGoogle = async (credential: string) => {
+    setSigningIn(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not sign in with Google.");
+      localStorage.setItem(TOKEN_KEY, data.token);
+      setToken(data.token);
+      await loadBilling(data.token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign in with Google.");
     } finally {
       setSigningIn(false);
     }
@@ -217,6 +246,16 @@ export function AccountClient() {
               <p className="mt-3 text-ink-dim">Sign in with your GoPlate owner account to view or change your subscription.</p>
             </div>
             <form onSubmit={signIn} className="mt-10 rounded-[24px] border border-navy-700 bg-navy-900 p-7 sm:p-8 space-y-4">
+              {googleClientId && (
+                <>
+                  <GoogleButton
+                    clientId={googleClientId}
+                    onCredential={signInWithGoogle}
+                    text="signin_with"
+                  />
+                  <AuthDivider />
+                </>
+              )}
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-ink-faint">Email</label>
                 <input
@@ -231,15 +270,9 @@ export function AccountClient() {
               </div>
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-ink-faint">Password</label>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="••••••••"
-                  className="mt-2 w-full rounded-xl border border-navy-700 bg-navy-800 px-4 py-3 text-sm text-ink outline-none focus:border-accent"
-                />
+                <div className="mt-2">
+                  <PasswordInput value={password} onChange={setPassword} required />
+                </div>
               </div>
               <button
                 type="submit"

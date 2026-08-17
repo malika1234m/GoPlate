@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/portal";
-import { Btn, ErrorNote, Field, inputCls } from "@/components/portal/ui";
+import { Btn, ErrorNote, Field, PasswordInput, inputCls } from "@/components/portal/ui";
 import { AuthDivider, GoogleButton } from "@/components/portal/GoogleButton";
 
 /** `googleClientId` is resolved on the server; empty means Google is unconfigured. */
@@ -97,7 +97,7 @@ export function LoginClient({ googleClientId = "" }: { googleClientId?: string }
               <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@restaurant.com" className={inputCls} />
             </Field>
             <Field label="Password">
-              <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className={inputCls} />
+              <PasswordInput value={password} onChange={setPassword} required />
             </Field>
             <div className="flex justify-end">
               <Link href="/forgot-password" className="text-xs font-semibold text-ink-dim hover:text-accent">
