@@ -10,6 +10,13 @@ const schema = z.object({
 });
 
 /**
+ * A real bcrypt hash (cost 10) of a random string nobody holds. Compared
+ * against when the email matches no admin, purely to keep the response time
+ * indistinguishable from a wrong-password attempt.
+ */
+const DUMMY_HASH = "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
+/**
  * Back-office sign-in. Separate endpoint from /api/auth/login and separate
  * credentials — an owner account, however privileged, cannot sign in here.
  */
@@ -28,9 +35,21 @@ export async function POST(req: Request) {
   const { email, password } = parsed.data;
 
   const admin = await prisma.admin.findUnique({ where: { email } });
+
+  /**
+   * Always spend the cost of a bcrypt comparison, even when no such admin
+   * exists. Returning early would answer an unknown email measurably faster
+   * than a known one (~130ms apart, comfortably detectable over the network),
+   * which is enough to enumerate valid staff emails without ever guessing a
+   * password. The dummy hash below is a real bcrypt digest of a random string,
+   * so the work performed matches the genuine path.
+   */
+  const hash = admin?.passwordHash ?? DUMMY_HASH;
+  const passwordMatches = await bcrypt.compare(password, hash);
+
   // One message for "no such admin" and "wrong password" — the back office
   // should not confirm which staff emails are real.
-  if (!admin || !(await bcrypt.compare(password, admin.passwordHash))) {
+  if (!admin || !passwordMatches) {
     return Response.json({ error: "Invalid email or password" }, { status: 401 });
   }
 

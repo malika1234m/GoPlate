@@ -23,13 +23,22 @@ const MIME: Record<string, string> = {
 // Hex-key filenames only — no traversal, no surprises.
 const SAFE_NAME = /^[a-z0-9-]+\.[a-z0-9]+$/i;
 
+/**
+ * Payment slips share this directory but must never be served here: they show
+ * bank details and belong only to a signed-in admin, via
+ * /api/admin/requests/[id]/slip. Their names are unguessable, but a random name
+ * is obscurity, not access control — one leaked filename (a log line, a backup,
+ * a future endpoint that returns it) would otherwise be enough to read it.
+ */
+const PRIVATE_PREFIX = "slip-";
+
 type Params = { params: Promise<{ name: string }> };
 
 export async function GET(req: Request, { params }: Params) {
   const { name } = await params;
   const ext = path.extname(name).toLowerCase();
   const mime = MIME[ext];
-  if (!SAFE_NAME.test(name) || !mime) {
+  if (!SAFE_NAME.test(name) || !mime || name.startsWith(PRIVATE_PREFIX)) {
     return new Response("Not found", { status: 404 });
   }
 
