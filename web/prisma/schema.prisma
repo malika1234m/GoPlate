@@ -26,6 +26,8 @@ model User {
   createdAt            DateTime             @default(now())
   restaurants          Restaurant[]
   passwordResets       PasswordResetToken[]
+  upgradeRequests      UpgradeRequest[]
+  supportMessages      SupportMessage[]
 }
 
 /**
@@ -145,4 +147,77 @@ model ModifierOption {
   sortOrder  Int           @default(0)
   group      ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   groupId    String
+}
+
+/**
+ * ============================ Back office ============================
+ */
+
+/**
+ * Staff account for the admin console. Deliberately a separate table from
+ * User rather than an `isAdmin` flag: owner tokens and admin tokens are then
+ * issued from different records and carry different claims, so no bug in the
+ * owner API can ever hand out back-office access. There is no public sign-up —
+ * rows are created with `node prisma/create-admin.mjs`.
+ */
+model Admin {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  tokenVersion Int       @default(0) // bump to revoke every existing admin session
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  reviewedRequests UpgradeRequest[]
+  handledMessages  SupportMessage[]
+}
+
+/**
+ * An owner asking to move onto a paid plan while payment is still manual
+ * (no gateway yet): they transfer the money and attach the slip, an admin
+ * checks it and applies the plan.
+ * `slipFile` is a bare filename, never a public /uploads URL — payment slips
+ * carry bank details, and /uploads/[name] serves anything it is given without
+ * asking who is calling. The file is readable only through the admin-only
+ * slip route.
+ */
+model UpgradeRequest {
+  id            String    @id @default(cuid())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  requestedPlan String // basic | starter | pro
+  amount        Float     @default(0) // what the owner says they paid
+  currency      String    @default("USD")
+  slipFile      String    @default("")
+  note          String    @default("") // owner's message: reference number, bank, etc.
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewNote    String    @default("") // admin's reason, shown back to the owner
+  reviewedAt    DateTime?
+  reviewedBy    Admin?    @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedById  String?
+  createdAt     DateTime  @default(now())
+
+  @@index([status])
+  @@index([userId])
+}
+
+/**
+ * "Something is wrong" from an owner, answered from the admin console.
+ */
+model SupportMessage {
+  id          String    @id @default(cuid())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  subject     String
+  body        String
+  status      String    @default("OPEN") // OPEN | RESOLVED
+  reply       String    @default("")
+  repliedAt   DateTime?
+  handledBy   Admin?    @relation(fields: [handledById], references: [id], onDelete: SetNull)
+  handledById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([status])
+  @@index([userId])
 }

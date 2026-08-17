@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AuthDivider, GoogleButton } from "@/components/portal/GoogleButton";
 import { PasswordInput } from "@/components/portal/ui";
+import { UpgradeRequestPanel, SupportPanel } from "@/components/account/OwnerRequests";
 
 /**
  * Owner-facing web billing. Subscriptions are handled here (on the web),
@@ -69,6 +70,8 @@ const tick = (
 /** `googleClientId` is resolved on the server; empty means Google is unconfigured. */
 export function AccountClient({ googleClientId = "" }: { googleClientId?: string }) {
   const [token, setToken] = useState<string | null>(null);
+  // Shared between the plan cards and the request form below them.
+  const [requestPlan, setRequestPlan] = useState<Plan>("starter");
   const [billing, setBilling] = useState<Billing | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
@@ -350,23 +353,11 @@ export function AccountClient({ googleClientId = "" }: { googleClientId?: string
             </div>
 
             {!billing.billingConfigured && (
-              <div
-                className="mt-6 rounded-[20px] border p-6"
-                style={{ borderColor: "rgba(240,118,46,0.35)", background: "rgba(240,118,46,0.06)" }}
-              >
-                <p className="text-sm font-bold text-ink">Plans are activated personally right now</p>
-                <p className="mt-1.5 text-sm text-ink-dim leading-relaxed">
-                  While we finish online card payments, we set plans up for you directly — usually within a few
-                  hours. Tell us which plan you want and we&apos;ll activate it on your account.
-                </p>
-                <a
-                  href="mailto:malikanishnatha4@gmail.com?subject=Activate my GoPlate plan&body=Hi! Please activate a plan on my GoPlate account. The email I signed up with is: ______ and I'd like the ______ plan (Basic / Starter / Pro)."
-                  className="mt-4 inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm font-bold text-white"
-                  style={{ background: "linear-gradient(100deg, var(--accent), #f5934f)" }}
-                >
-                  Contact us to activate
-                </a>
-              </div>
+              <UpgradeRequestPanel
+                token={token}
+                selectedPlan={requestPlan}
+                onSelectPlan={setRequestPlan}
+              />
             )}
 
             {/* Plan chooser */}
@@ -407,8 +398,15 @@ export function AccountClient({ googleClientId = "" }: { googleClientId?: string
                         {tick} Current plan
                       </div>
                     ) : !billing.billingConfigured ? (
-                      <a
-                        href={`mailto:malikanishnatha4@gmail.com?subject=Activate the ${p.name} plan&body=Hi! Please activate the ${p.name} plan on my GoPlate account. The email I signed up with is: ______`}
+                      <button
+                        onClick={() => {
+                          // Preselect the plan in the request form, then take
+                          // them to it — otherwise they'd pick the plan twice.
+                          setRequestPlan(p.id);
+                          document
+                            .getElementById("upgrade-request")
+                            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
                         className="mt-6 flex w-full items-center justify-center rounded-full py-3.5 text-sm font-bold transition-colors"
                         style={
                           p.highlight
@@ -416,8 +414,8 @@ export function AccountClient({ googleClientId = "" }: { googleClientId?: string
                             : { border: "1px solid var(--navy-700)", color: "var(--ink)" }
                         }
                       >
-                        Contact us for {p.name}
-                      </a>
+                        Request {p.name}
+                      </button>
                     ) : (
                       <button
                         onClick={() => upgrade(p.id)}
@@ -443,6 +441,8 @@ export function AccountClient({ googleClientId = "" }: { googleClientId?: string
                 : "Cancel anytime — no contracts. "}
               Your published menu stays live for customers even if your plan lapses.
             </p>
+
+            <SupportPanel token={token} />
           </section>
         )}
       </main>

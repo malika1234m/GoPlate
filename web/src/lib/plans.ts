@@ -16,15 +16,23 @@ export const PLANS: Record<
   {
     label: string;
     priceLabel: string;
+    /** Monthly price as a number — the back office needs to do arithmetic on it. */
+    priceUsd: number;
     maxRestaurants: number;
     maxModels: number;
     maxVideos: number;
   }
 > = {
-  basic: { label: "Basic", priceLabel: "$2/mo", maxRestaurants: 1, maxModels: 2, maxVideos: 2 },
-  starter: { label: "Starter", priceLabel: "$12/mo", maxRestaurants: 1, maxModels: 10, maxVideos: 10 },
-  pro: { label: "Pro", priceLabel: "$29/mo", maxRestaurants: 10, maxModels: -1, maxVideos: -1 },
+  basic: { label: "Basic", priceLabel: "$2/mo", priceUsd: 2, maxRestaurants: 1, maxModels: 2, maxVideos: 2 },
+  starter: { label: "Starter", priceLabel: "$12/mo", priceUsd: 12, maxRestaurants: 1, maxModels: 10, maxVideos: 10 },
+  pro: { label: "Pro", priceLabel: "$29/mo", priceUsd: 29, maxRestaurants: 10, maxModels: -1, maxVideos: -1 },
 };
+
+export const PLAN_IDS: Plan[] = ["basic", "starter", "pro"];
+
+export function isPlan(value: string): value is Plan {
+  return (PLAN_IDS as string[]).includes(value);
+}
 
 export function planOf(user: { plan: string }): Plan {
   if (user.plan === "pro") return "pro";
