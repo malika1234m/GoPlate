@@ -5,6 +5,10 @@ import { getAuthUser, unauthorized } from "@/lib/auth";
 import { accessExpired } from "@/lib/plans";
 import { uploadsDir } from "@/lib/uploads";
 import { optimizeGlb } from "@/lib/model-optimize";
+import { optimizeImage, optimizeVideoInPlace } from "@/lib/media-optimize";
+
+const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp"];
+const VIDEO_EXTS = [".mp4", ".mov", ".webm"];
 
 /**
  * Media upload (dish photos and videos) from the mobile app.
@@ -57,12 +61,28 @@ export async function POST(req: Request) {
 
   const dir = uploadsDir();
   await mkdir(dir, { recursive: true });
-  const filename = `${crypto.randomBytes(12).toString("hex")}${ext}`;
   let bytes: Uint8Array = Buffer.from(await file.arrayBuffer());
+
   // A hand-uploaded model gets the same treatment as a generated one — an
   // owner exporting from Blender or Meshy has no reason to know about Draco.
   if (ext === ".glb") bytes = await optimizeGlb(bytes);
-  await writeFile(path.join(dir, filename), bytes);
+
+  // Photos re-encode fast enough to do before responding, and may change
+  // extension in the process (JPEG in, WebP out).
+  if (IMAGE_EXTS.includes(ext)) {
+    const optimized = await optimizeImage(bytes, ext);
+    bytes = optimized.bytes;
+    ext = optimized.ext;
+  }
+
+  const filename = `${crypto.randomBytes(12).toString("hex")}${ext}`;
+  const filePath = path.join(dir, filename);
+  await writeFile(filePath, bytes);
+
+  // Video is transcoded after the response: a 100 MB clip takes tens of
+  // seconds, and making the phone wait risks it timing out and losing the
+  // upload. The file is replaced in place, so this URL stays correct either way.
+  if (VIDEO_EXTS.includes(ext)) optimizeVideoInPlace(filePath);
 
   return Response.json({ url: `/uploads/${filename}` }, { status: 201 });
 }

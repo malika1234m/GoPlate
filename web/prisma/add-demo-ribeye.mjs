@@ -7,6 +7,7 @@ const prisma = new PrismaClient();
 
 const NAME = "Charred Ribeye";
 const MODEL_URL = "/demo/steak.glb";
+const IMAGE_URL = "/demo/steak.webp";
 
 const restaurant = await prisma.restaurant.findUnique({
   where: { slug: "demo-bistro" },
@@ -33,7 +34,14 @@ const existing = await prisma.menuItem.findFirst({
 if (existing) {
   await prisma.menuItem.update({
     where: { id: existing.id },
-    data: { modelUrl: MODEL_URL, modelStatus: "READY", sortOrder: topSortOrder },
+    data: {
+      modelUrl: MODEL_URL,
+      modelStatus: "READY",
+      sortOrder: topSortOrder,
+      // Also re-pointed here, not only on create: databases seeded before the
+      // real plate photo existed still carry the placeholder SVG.
+      imageUrl: IMAGE_URL,
+    },
   });
   console.log(`updated: ${NAME} (sortOrder ${topSortOrder})`);
 } else {
@@ -44,7 +52,7 @@ if (existing) {
         "Grass-fed ribeye over open flame, rosemary butter, blistered vine tomatoes, crushed herb potatoes.",
       caption: "Rested ten minutes, always",
       price: 28,
-      imageUrl: "/demo/steak.svg",
+      imageUrl: IMAGE_URL,
       sortOrder: topSortOrder,
       categoryId: mains.id,
       restaurantId: restaurant.id,
