@@ -68,10 +68,30 @@ export function TemplatePicker({
                       : { borderColor: "var(--navy-700)" }
                   }
                 >
+                  {/*
+                    A miniature menu row rather than a plain colour chip. Every
+                    dark template's background sits within a few percent of the
+                    others, so a single square made all six look identical; what
+                    actually separates them is the text and accent they carry.
+                  */}
                   <span
-                    className="mt-0.5 h-8 w-8 shrink-0 rounded-lg border"
-                    style={{ background: t.swatch, borderColor: "var(--navy-700)" }}
-                  />
+                    aria-hidden
+                    className="mt-0.5 flex h-11 w-11 shrink-0 flex-col justify-center gap-[3px] rounded-lg border px-1.5"
+                    style={{ background: t.palette["--m-bg"], borderColor: "var(--navy-700)" }}
+                  >
+                    <span
+                      className="block h-[3px] w-full rounded-full"
+                      style={{ background: t.palette["--m-text"] }}
+                    />
+                    <span
+                      className="block h-[3px] w-3/5 rounded-full"
+                      style={{ background: t.palette["--m-dim"] }}
+                    />
+                    <span
+                      className="block h-[5px] w-2/5 rounded-full"
+                      style={{ background: t.suggestedAccent }}
+                    />
+                  </span>
                   <span className="min-w-0">
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span
