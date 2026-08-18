@@ -4,12 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Restaurant } from "@/lib/portal";
 import { Btn, Confirm, CurrencySelect, ErrorNote, Field, inputCls } from "@/components/portal/ui";
-
-const THEMES = [
-  { id: "midnight", label: "Midnight", swatch: "#070708" },
-  { id: "espresso", label: "Espresso", swatch: "#14100c" },
-  { id: "ivory", label: "Ivory", swatch: "#f8f4ec" },
-] as const;
+import { TemplatePicker } from "@/components/portal/TemplatePicker";
 
 export function SettingsTab({
   restaurant,
@@ -132,25 +127,15 @@ export function SettingsTab({
         {/* Look & feel */}
         <div className="rounded-2xl border border-navy-700 bg-navy-900 p-5 space-y-4">
           <p className="text-sm font-bold text-ink">Menu look &amp; feel</p>
+          <TemplatePicker
+            themeId={theme}
+            accent={accent}
+            layout={layout}
+            onSelect={setTheme}
+            onAccent={setAccent}
+          />
+
           <div className="flex flex-wrap items-center gap-2">
-            {THEMES.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTheme(t.id)}
-                aria-pressed={theme === t.id}
-                className="flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold"
-                style={
-                  theme === t.id
-                    ? { borderColor: "var(--accent)", color: "var(--accent)" }
-                    : { borderColor: "var(--navy-700)", color: "var(--ink-dim)" }
-                }
-              >
-                <span className="h-3.5 w-3.5 rounded-full border border-navy-700" style={{ background: t.swatch }} />
-                {t.label}
-              </button>
-            ))}
-            <span className="mx-2 h-5 w-px bg-navy-700" aria-hidden />
             {(["list", "grid"] as const).map((l) => (
               <button
                 key={l}

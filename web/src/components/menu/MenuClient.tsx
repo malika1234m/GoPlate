@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
 import { MenuBootOverlay } from "./MenuBootOverlay";
+import { paletteOf } from "@/lib/menu-themes";
 import { OrderCart, CartLine, cartKey } from "./OrderCart";
 
 export type PublicModifierOption = {
@@ -64,38 +65,7 @@ export type PublicRestaurant = {
 
 /* ---------- Owner-selectable menu themes ---------- */
 
-const THEMES: Record<string, Record<string, string>> = {
-  midnight: {
-    "--m-bg": "#070708",
-    "--m-surface": "#121214",
-    "--m-raised": "#1b1b1f",
-    "--m-border": "#28282e",
-    "--m-text": "#f4f4f1",
-    "--m-dim": "#b9b9b2",
-    "--m-faint": "#80807a",
-    "--m-scrim": "rgba(7,7,8,0.97)",
-  },
-  espresso: {
-    "--m-bg": "#14100c",
-    "--m-surface": "#1c1610",
-    "--m-raised": "#2a2118",
-    "--m-border": "#3b2f22",
-    "--m-text": "#f3e9dc",
-    "--m-dim": "#c9bba9",
-    "--m-faint": "#8f8171",
-    "--m-scrim": "rgba(20,16,12,0.97)",
-  },
-  ivory: {
-    "--m-bg": "#f8f4ec",
-    "--m-surface": "#ffffff",
-    "--m-raised": "#f1ead9",
-    "--m-border": "#e5dcc8",
-    "--m-text": "#241d14",
-    "--m-dim": "#5f5546",
-    "--m-faint": "#94897a",
-    "--m-scrim": "rgba(248,244,236,0.97)",
-  },
-};
+/* Menu palettes live in src/lib/menu-themes.ts — see the note there. */
 
 const poppins = { fontFamily: "var(--font-poppins)" };
 
@@ -847,7 +817,7 @@ export function MenuClient({
   orderingEnabled?: boolean;
 }) {
   const currency = useCurrency(restaurant.currency);
-  const theme = THEMES[restaurant.theme] ?? THEMES.midnight;
+  const theme = paletteOf(restaurant.theme);
 
   const categories = restaurant.categories.filter((c) => c.items.length > 0);
   const allItems = categories.flatMap((c) => c.items);

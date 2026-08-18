@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isMenuTheme } from "@/lib/menu-themes";
 import { prisma } from "@/lib/db";
 import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
 import { accessExpired } from "@/lib/plans";
@@ -45,7 +46,8 @@ const updateSchema = z.object({
   phone: z.string().max(40).optional(),
   currency: z.string().max(8).optional(),
   accentColor: z.string().max(16).optional(),
-  theme: z.enum(["midnight", "espresso", "ivory"]).optional(),
+  // Any template defined in src/lib/menu-themes.ts — no enum to keep in sync.
+  theme: z.string().refine(isMenuTheme, "Unknown template").optional(),
   layout: z.enum(["list", "grid"]).optional(),
   showReel: z.boolean().optional(),
   logoUrl: z.string().max(500).optional(),
