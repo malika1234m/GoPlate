@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin-auth";
-import { PLANS, type Plan } from "@/lib/plans";
+import { PLANS, priceFor, type BillingPeriod, type Plan } from "@/lib/plans";
 
 /**
  * The review queue. Defaults to PENDING because that is the only status that
@@ -30,8 +30,14 @@ export async function GET(req: Request) {
       id: r.id,
       status: r.status,
       requestedPlan: r.requestedPlan,
+      billingPeriod: r.billingPeriod,
       planLabel: PLANS[r.requestedPlan as Plan]?.label ?? r.requestedPlan,
-      planPriceUsd: PLANS[r.requestedPlan as Plan]?.priceUsd ?? 0,
+      // What this plan costs for the period they actually bought, so the
+      // reviewer compares the slip against the right number.
+      planPriceUsd:
+        PLANS[r.requestedPlan as Plan]
+          ? priceFor(r.requestedPlan as Plan, r.billingPeriod as BillingPeriod)
+          : 0,
       amount: r.amount,
       currency: r.currency,
       note: r.note,

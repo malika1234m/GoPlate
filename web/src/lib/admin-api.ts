@@ -98,6 +98,7 @@ export type AdminRequest = {
   id: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
   requestedPlan: string;
+  billingPeriod: string;
   planLabel: string;
   planPriceUsd: number;
   amount: number;

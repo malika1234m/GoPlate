@@ -37,6 +37,8 @@ export function RestaurantClient({ id }: { id: string }) {
   const [catName, setCatName] = useState("");
   const [catAllDay, setCatAllDay] = useState(true);
   const [catFrom, setCatFrom] = useState("");
+  // "" = a top-level section; otherwise the section this sits inside.
+  const [catParent, setCatParent] = useState("");
   const [catTo, setCatTo] = useState("");
   const [catErr, setCatErr] = useState("");
   const [catBusy, setCatBusy] = useState(false);
@@ -61,8 +63,9 @@ export function RestaurantClient({ id }: { id: string }) {
     load();
   }, [router, load]);
 
-  const openCatModal = (cat?: Category) => {
+  const openCatModal = (cat?: Category, parentId?: string) => {
     setCatName(cat?.name ?? "");
+    setCatParent(cat?.parentId ?? parentId ?? "");
     const limited = !!(cat?.availableFrom && cat?.availableTo);
     setCatAllDay(!limited);
     setCatFrom(cat?.availableFrom ?? "");
@@ -85,6 +88,7 @@ export function RestaurantClient({ id }: { id: string }) {
         name: catName.trim(),
         availableFrom: catAllDay ? "" : catFrom,
         availableTo: catAllDay ? "" : catTo,
+        parentId: catParent || null,
       };
       if (catModal?.cat) await api.updateCategory(catModal.cat.id, body);
       else await api.createCategory(id, body);
@@ -203,10 +207,20 @@ export function RestaurantClient({ id }: { id: string }) {
                   </div>
                 )}
 
-                {(restaurant.categories ?? []).map((cat) => (
-                  <div key={cat.id} className="mt-8">
+                {(restaurant.categories ?? [])
+                  // Sections first, each immediately followed by its own
+                  // sub-sections, so the list reads the way the menu does.
+                  .flatMap((c) =>
+                    c.parentId
+                      ? []
+                      : [c, ...(restaurant.categories ?? []).filter((s2) => s2.parentId === c.id)]
+                  )
+                  .map((cat) => (
+                  <div key={cat.id} className={cat.parentId ? "mt-6 pl-5 border-l border-navy-700" : "mt-8"}>
                     <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-xl font-extrabold text-ink">{cat.name}</h2>
+                      <h2 className={cat.parentId ? "text-base font-bold text-ink" : "text-xl font-extrabold text-ink"}>
+                        {cat.name}
+                      </h2>
                       {cat.availableFrom && cat.availableTo && (
                         <span className="rounded-full border border-sky-500/40 px-2.5 py-0.5 text-[11px] font-semibold text-sky-400">
                           {cat.availableFrom}–{cat.availableTo}
@@ -217,6 +231,11 @@ export function RestaurantClient({ id }: { id: string }) {
                         <button onClick={() => openCatModal(cat)} className="rounded-full border border-navy-700 px-3 py-1 text-xs font-semibold text-ink-dim hover:text-ink">
                           Edit
                         </button>
+                        {!cat.parentId && (
+                          <button onClick={() => openCatModal(undefined, cat.id)} className="rounded-full border border-navy-700 px-3 py-1 text-xs font-semibold text-ink-dim hover:text-accent">
+                            + Sub-section
+                          </button>
+                        )}
                         <button onClick={() => setDeleteCat(cat)} className="rounded-full border border-navy-700 px-3 py-1 text-xs font-semibold text-ink-dim hover:text-red-400">
                           Delete
                         </button>
@@ -282,10 +301,52 @@ export function RestaurantClient({ id }: { id: string }) {
 
       {/* Category create/edit */}
       {catModal && (
-        <Modal title={catModal.cat ? "Edit category" : "New category"} onClose={() => setCatModal(null)}>
+        <Modal
+          title={(() => {
+            const parent = catParent
+              ? (restaurant?.categories ?? []).find((c) => c.id === catParent)?.name
+              : null;
+            // The heading has to match the button they pressed: pressing
+            // "+ Sub-section" on Mains and being shown "New category" reads as
+            // if the app ignored the choice.
+            if (catModal.cat) return parent ? `Edit sub-section in ${parent}` : "Edit section";
+            return parent ? `New sub-section in ${parent}` : "New section";
+          })()}
+          onClose={() => setCatModal(null)}
+        >
           <form onSubmit={saveCategory} className="space-y-4">
             <Field label="Name">
-              <input autoFocus required value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="e.g. Starters" className={inputCls} />
+              <input autoFocus required value={catName} onChange={(e) => setCatName(e.target.value)} placeholder={catParent ? "e.g. Kottu" : "e.g. Starters"} className={inputCls} />
+            </Field>
+
+            {/*
+              Sub-sections are how a long menu stays findable: Mains → Kottu,
+              Desserts → Cakes, Beverages → Fresh Juices. Only top-level
+              sections can be parents, so the menu never goes three deep.
+            */}
+            <Field
+              label="Where does this go?"
+              hint="Put it inside a section to group similar dishes together."
+            >
+              <select
+                value={catParent}
+                onChange={(e) => setCatParent(e.target.value)}
+                className={`${inputCls} cursor-pointer`}
+              >
+                <option value="">Top-level section</option>
+                {(restaurant?.categories ?? [])
+                  .filter(
+                    (c) =>
+                      !c.parentId &&
+                      // A section can't be put inside itself.
+                      c.id !== catModal?.cat?.id
+                  )
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      Inside {c.name}
+                    </option>
+                  ))}
+              </select>
             </Field>
 
             {/* Serving hours: All day by default, native time pickers when limited */}
@@ -360,7 +421,17 @@ export function RestaurantClient({ id }: { id: string }) {
       {deleteCat && (
         <Confirm
           title={`Delete “${deleteCat.name}”?`}
-          body={`This removes the category and its ${deleteCat.items.length} ${deleteCat.items.length === 1 ? "dish" : "dishes"} from your menu. This can't be undone.`}
+          body={(() => {
+            const subs = (restaurant?.categories ?? []).filter((c) => c.parentId === deleteCat.id);
+            const subDishes = subs.reduce((n, c) => n + c.items.length, 0);
+            const dishes = deleteCat.items.length + subDishes;
+            const dishText = `${dishes} ${dishes === 1 ? "dish" : "dishes"}`;
+            // Without naming the sub-sections an owner deleting "Mains" would
+            // expect to lose 7 dishes and actually lose 11 plus two sections.
+            return subs.length > 0
+              ? `This removes “${deleteCat.name}”, its ${subs.length} sub-section${subs.length === 1 ? "" : "s"} (${subs.map((c) => c.name).join(", ")}) and all ${dishText} inside them. This can't be undone.`
+              : `This removes the section and its ${dishText} from your menu. This can't be undone.`;
+          })()}
           confirmLabel="Delete category"
           danger
           busy={catBusy}
@@ -372,6 +443,7 @@ export function RestaurantClient({ id }: { id: string }) {
       {/* Dish create/edit drawer */}
       {drawer && restaurant && (
         <DishDrawer
+            categories={restaurant?.categories ?? []}
           restaurantId={id}
           categoryId={drawer.categoryId}
           item={drawer.item}

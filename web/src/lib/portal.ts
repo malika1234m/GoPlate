@@ -96,6 +96,8 @@ export type Category = {
   sortOrder: number;
   availableFrom: string;
   availableTo: string;
+  /** Null for a top-level section; otherwise the section it sits inside. */
+  parentId: string | null;
   items: MenuItem[];
 };
 
@@ -170,7 +172,10 @@ export const api = {
   deleteRestaurant: (id: string) =>
     req<{ ok: boolean }>(`/api/restaurants/${id}`, { method: "DELETE" }),
 
-  createCategory: (rid: string, body: { name: string; availableFrom?: string; availableTo?: string }) =>
+  createCategory: (
+    rid: string,
+    body: { name: string; availableFrom?: string; availableTo?: string; parentId?: string | null }
+  ) =>
     req<{ category: Category }>(`/api/restaurants/${rid}/categories`, { body }),
   updateCategory: (id: string, body: Partial<Category>) =>
     req<{ category: Category }>(`/api/categories/${id}`, { method: "PATCH", body }),

@@ -18,17 +18,39 @@ export const PLANS: Record<
     priceLabel: string;
     /** Monthly price as a number — the back office needs to do arithmetic on it. */
     priceUsd: number;
+    /**
+     * Yearly price: ten months for twelve, i.e. two months free. Stored rather
+     * than derived so a promotion can move one plan without a magic multiplier
+     * spreading through the pricing page, the request form and the admin totals.
+     */
+    priceYearlyUsd: number;
     maxRestaurants: number;
     maxModels: number;
     maxVideos: number;
   }
 > = {
-  basic: { label: "Basic", priceLabel: "$2/mo", priceUsd: 2, maxRestaurants: 1, maxModels: 2, maxVideos: 2 },
-  starter: { label: "Starter", priceLabel: "$12/mo", priceUsd: 12, maxRestaurants: 1, maxModels: 10, maxVideos: 10 },
-  pro: { label: "Pro", priceLabel: "$29/mo", priceUsd: 29, maxRestaurants: 10, maxModels: -1, maxVideos: -1 },
+  basic: { label: "Basic", priceLabel: "$2/mo", priceUsd: 2, priceYearlyUsd: 20, maxRestaurants: 1, maxModels: 2, maxVideos: 2 },
+  starter: { label: "Starter", priceLabel: "$12/mo", priceUsd: 12, priceYearlyUsd: 120, maxRestaurants: 1, maxModels: 10, maxVideos: 10 },
+  pro: { label: "Pro", priceLabel: "$29/mo", priceUsd: 29, priceYearlyUsd: 290, maxRestaurants: 10, maxModels: -1, maxVideos: -1 },
 };
 
 export const PLAN_IDS: Plan[] = ["basic", "starter", "pro"];
+
+export type BillingPeriod = "monthly" | "yearly";
+
+/** What an owner pays today for a given plan and period. */
+export function priceFor(plan: Plan, period: BillingPeriod): number {
+  return period === "yearly" ? PLANS[plan].priceYearlyUsd : PLANS[plan].priceUsd;
+}
+
+/**
+ * Headline saving, rounded down so the marketing claim is never larger than
+ * the real discount. At ten-months-for-twelve this reads "Save 16%".
+ */
+export function yearlySavingPercent(plan: Plan = "starter"): number {
+  const full = PLANS[plan].priceUsd * 12;
+  return Math.floor(((full - PLANS[plan].priceYearlyUsd) / full) * 100);
+}
 
 /**
  * Ordering used to gate features that get richer as the plan does.

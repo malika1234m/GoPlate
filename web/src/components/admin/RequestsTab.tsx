@@ -164,8 +164,9 @@ function RequestCard({
             {r.user.name} <span className="font-normal text-ink-dim">· {r.user.email}</span>
           </p>
           <p className="mt-0.5 text-xs text-ink-faint">
-            wants <span className="font-semibold text-ink-dim">{r.planLabel}</span> · paid{" "}
-            {r.currency} {r.amount.toFixed(2)} · {new Date(r.createdAt).toLocaleDateString()}
+            wants <span className="font-semibold text-ink-dim">{r.planLabel}</span>
+            {r.billingPeriod === "yearly" ? " yearly" : " monthly"} · paid {r.currency}{" "}
+            {r.amount.toFixed(2)} · {new Date(r.createdAt).toLocaleDateString()}
           </p>
         </div>
         <span className="shrink-0 text-xs font-bold uppercase tracking-wider" style={{ color: statusColor }}>
@@ -182,11 +183,16 @@ function RequestCard({
                 {r.user.currentlyPaying ? " (paying)" : " (not paying)"}
               </p>
               <p className="text-ink-dim">
-                Plan price: <span className="text-ink">${expected}/mo</span>
+                Plan price:{" "}
+                <span className="text-ink">
+                  ${expected}
+                  {r.billingPeriod === "yearly" ? "/yr" : "/mo"}
+                </span>
               </p>
               {amountLooksOff && (
                 <p className="font-semibold" style={{ color: "#e8a02a" }}>
-                  Paid less than one month of {r.planLabel} — check before approving.
+                  Paid less than one {r.billingPeriod === "yearly" ? "year" : "month"} of{" "}
+                  {r.planLabel} — check before approving.
                 </p>
               )}
               {r.note && (

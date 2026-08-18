@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { getAuthUser, unauthorized } from "@/lib/auth";
 import { uploadsDir } from "@/lib/uploads";
 import { optimizeImage } from "@/lib/media-optimize";
-import { isPlan, PLANS } from "@/lib/plans";
+import { isPlan, PLANS, priceFor, type BillingPeriod } from "@/lib/plans";
 import { rateLimit, tooManyRequests } from "@/lib/ratelimit";
 
 const MAX_SLIP_BYTES = 10 * 1024 * 1024;
@@ -39,6 +39,11 @@ export async function POST(req: Request) {
   if (!Number.isFinite(amount) || amount < 0 || amount > 100_000) {
     return Response.json({ error: "Enter the amount you paid." }, { status: 400 });
   }
+
+  // Anything other than "yearly" is treated as monthly — the safer default,
+  // since it grants the shorter period if the field is ever malformed.
+  const billingPeriod: BillingPeriod =
+    String(form.get("billingPeriod") ?? "monthly") === "yearly" ? "yearly" : "monthly";
 
   const note = String(form.get("note") ?? "").slice(0, 1000);
   const currency = String(form.get("currency") ?? "USD").slice(0, 8).toUpperCase();
@@ -92,6 +97,7 @@ export async function POST(req: Request) {
     data: {
       userId: user.id,
       requestedPlan,
+      billingPeriod,
       amount,
       currency,
       note,
@@ -104,7 +110,9 @@ export async function POST(req: Request) {
       request: {
         id: created.id,
         requestedPlan: created.requestedPlan,
+        billingPeriod: created.billingPeriod,
         planLabel: PLANS[requestedPlan].label,
+        expected: priceFor(requestedPlan, billingPeriod),
         status: created.status,
         createdAt: created.createdAt,
       },
@@ -125,6 +133,7 @@ export async function GET(req: Request) {
     select: {
       id: true,
       requestedPlan: true,
+      billingPeriod: true,
       amount: true,
       currency: true,
       status: true,

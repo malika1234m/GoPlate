@@ -99,6 +99,23 @@ model Category {
   restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   restaurantId  String
   items         MenuItem[]
+
+  /**
+   * Sub-sections, e.g. Mains → Tandoori Specialities / Kottu, or
+   * Beverages → Beer / Fresh Juices. A long menu under one flat heading is
+   * the hardest kind to order from.
+   * Deliberately capped at two levels in the API rather than the schema: a
+   * self-relation allows any depth, but a diner scanning a QR code at a table
+   * will not navigate a tree. Every existing category has parentId null and
+   * keeps behaving exactly as before.
+   * Cascade on delete: removing "Beverages" removes its sub-sections, and
+   * their dishes go with them through the existing item cascade.
+   */
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId String?
+  children Category[] @relation("CategoryTree")
+
+  @@index([restaurantId, parentId])
 }
 
 model MenuItem {
@@ -187,6 +204,12 @@ model UpgradeRequest {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId        String
   requestedPlan String // basic | starter | pro
+  /**
+   * monthly | yearly. Recorded because an approved slip for $120 means very
+   * different things on Starter depending on the period, and the back office
+   * cannot tell which was bought from the amount alone.
+   */
+  billingPeriod String    @default("monthly")
   amount        Float     @default(0) // what the owner says they paid
   currency      String    @default("USD")
   slipFile      String    @default("")

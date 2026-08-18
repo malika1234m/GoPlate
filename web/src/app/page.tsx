@@ -5,6 +5,8 @@ import { NavBar } from "@/components/home/NavBar";
 import { HeroShowcase, type ShowcaseDish } from "@/components/home/HeroShowcase";
 import { Reveal, CountUp, LiveDish3D } from "@/components/home/Dynamic";
 import { PhoneVideo } from "@/components/home/PhoneVideo";
+import { DemoQr } from "@/components/home/DemoQr";
+import { appUrl } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -470,6 +472,9 @@ export default async function Home() {
             </Reveal>
           </section>
         )}
+
+        {/* ================= SCAN THE DEMO ================= */}
+        <DemoQr appUrl={appUrl()} />
 
         {/* ================= LIVE DEMO MENU PREVIEW ================= */}
         <section className="pt-24">

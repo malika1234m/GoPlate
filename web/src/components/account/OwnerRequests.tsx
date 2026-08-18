@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PLANS, PLAN_IDS, type Plan } from "@/lib/plans";
+import { PLANS, PLAN_IDS, priceFor, yearlySavingPercent, type BillingPeriod, type Plan } from "@/lib/plans";
 import { Btn, ErrorNote, Field, inputCls } from "@/components/portal/ui";
 
 /* ---------- shared ---------- */
@@ -11,6 +11,7 @@ type Requested = {
   requestedPlan: string;
   amount: number;
   currency: string;
+  billingPeriod: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
   reviewNote: string;
   reviewedAt: string | null;
@@ -43,6 +44,7 @@ export function UpgradeRequestPanel({
   selectedPlan: Plan;
   onSelectPlan: (p: Plan) => void;
 }) {
+  const [period, setPeriod] = useState<BillingPeriod>("monthly");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [note, setNote] = useState("");
@@ -83,7 +85,8 @@ export function UpgradeRequestPanel({
     try {
       const form = new FormData();
       form.set("plan", selectedPlan);
-      form.set("amount", amount || String(PLANS[selectedPlan].priceUsd));
+      form.set("billingPeriod", period);
+      form.set("amount", amount || String(priceFor(selectedPlan, period)));
       form.set("currency", currency);
       form.set("note", note);
       if (slip) form.set("slip", slip);
@@ -126,7 +129,8 @@ export function UpgradeRequestPanel({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-navy-700 px-4 py-3 text-sm"
               >
                 <span className="text-ink-dim">
-                  {PLANS[r.requestedPlan as Plan]?.label ?? r.requestedPlan} · {r.currency}{" "}
+                  {PLANS[r.requestedPlan as Plan]?.label ?? r.requestedPlan}
+                  {r.billingPeriod === "yearly" ? " (yearly)" : " (monthly)"} · {r.currency}{" "}
                   {r.amount.toFixed(2)} · {new Date(r.createdAt).toLocaleDateString()}
                   {r.reviewNote && (
                     <span className="mt-1 block text-xs text-ink-faint">“{r.reviewNote}”</span>
@@ -150,6 +154,33 @@ export function UpgradeRequestPanel({
         </p>
       ) : (
         <form onSubmit={submit} className="mt-5 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {(["monthly", "yearly"] as const).map((pd) => (
+              <button
+                key={pd}
+                type="button"
+                onClick={() => setPeriod(pd)}
+                aria-pressed={period === pd}
+                className="rounded-full border px-4 py-2 text-xs font-bold capitalize transition-colors"
+                style={
+                  period === pd
+                    ? { borderColor: "var(--accent)", color: "var(--accent)", background: "rgba(240,118,46,0.08)" }
+                    : { borderColor: "var(--navy-700)", color: "var(--ink-dim)" }
+                }
+              >
+                {pd}
+              </button>
+            ))}
+            {/* "2 months free" rather than a percentage: it is the same offer
+                stated in a way an owner can check against their own bill. */}
+            <span
+              className="rounded-full px-3 py-1 text-[11px] font-bold"
+              style={{ background: "rgba(123,178,106,0.14)", color: "#8fc47d" }}
+            >
+              Yearly = 2 months free ({yearlySavingPercent()}% off)
+            </span>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Plan">
               <select
@@ -159,7 +190,8 @@ export function UpgradeRequestPanel({
               >
                 {PLAN_IDS.map((p) => (
                   <option key={p} value={p}>
-                    {PLANS[p].label} — {PLANS[p].priceLabel}
+                    {PLANS[p].label} — ${priceFor(p, period)}
+                    {period === "yearly" ? "/yr" : "/mo"}
                   </option>
                 ))}
               </select>
@@ -171,7 +203,7 @@ export function UpgradeRequestPanel({
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder={String(PLANS[selectedPlan].priceUsd)}
+                placeholder={String(priceFor(selectedPlan, period))}
                 className={inputCls}
               />
             </Field>

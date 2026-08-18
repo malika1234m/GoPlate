@@ -43,6 +43,8 @@ export type PublicCategory = {
   name: string;
   availableFrom: string;
   availableTo: string;
+  /** Null for a top-level section; otherwise the section this sits inside. */
+  parentId: string | null;
   items: PublicItem[];
 };
 
@@ -821,13 +823,33 @@ export function MenuClient({
   // Templates choose their headline face; body copy stays on the UI font.
   const display = { fontFamily: displayFontOf(restaurant.theme) };
 
-  const categories = restaurant.categories.filter((c) => c.items.length > 0);
+  /**
+   * The menu arrives flat; group it into section → sub-section here.
+   *
+   * A section is kept when it has dishes of its own OR any sub-section with
+   * dishes — otherwise "Beverages" would vanish while "Beer" and "Juices" were
+   * still full, because the parent itself holds no items.
+   */
+  const withItems = restaurant.categories.filter((c) => c.items.length > 0);
+  const sections = restaurant.categories
+    .filter((c) => !c.parentId)
+    .map((parent) => ({
+      ...parent,
+      children: withItems.filter((c) => c.parentId === parent.id),
+    }))
+    .filter((s) => s.items.length > 0 || s.children.length > 0);
+
+  // Flat list of everything renderable, used by the reel, search and counts.
+  const categories = sections.flatMap((s) =>
+    s.items.length > 0 ? [s as PublicCategory, ...s.children] : s.children
+  );
   const allItems = categories.flatMap((c) => c.items);
 
   const [stage, setStage] = useState<{ index: number; tab?: MediaTab } | null>(null);
   const [activeCat, setActiveCat] = useState<string>("all");
   const [view, setView] = useState<"grid" | "list">(restaurant.layout === "list" ? "list" : "grid");
   const [vegOnly, setVegOnly] = useState(false);
+  const [query, setQuery] = useState("");
 
   // Time-based state (serving windows, sold-out) activates after hydration.
   const [now, setNow] = useState<Date | null>(null);
@@ -840,8 +862,41 @@ export function MenuClient({
     };
   }, []);
 
+  /**
+   * Search runs over the copy already on the page — the entire menu ships with
+   * the first render, so a server round trip per keystroke would only add
+   * latency. Name, caption and description are all searched: a diner hunting
+   * "cheese" should find a dish whose description mentions it.
+   */
+  const q = query.trim().toLowerCase();
+  const searching = q.length > 0;
+  const searchResults = searching
+    ? categories.flatMap((cat) =>
+        cat.items
+          .filter((i) =>
+            [i.name, i.caption, i.description].some((f) => f?.toLowerCase().includes(q))
+          )
+          .filter((i) => !vegOnly || i.isVegetarian)
+          .map((item) => ({
+            item,
+            // The trail teaches the menu's shape while they search: a diner who
+            // finds "Chicken Kottu" under "Mains › Kottu" now knows where to
+            // look for more of the same.
+            trail: cat.parentId
+              ? `${sections.find((sec) => sec.id === cat.parentId)?.name ?? ""} › ${cat.name}`
+              : cat.name,
+          }))
+      )
+    : [];
+
+  const selectedSection = sections.find((sec) => sec.id === activeCat);
   const visibleCategories = categories
-    .filter((c) => activeCat === "all" || c.id === activeCat)
+    .filter((c) =>
+      activeCat === "all" ||
+      c.id === activeCat ||
+      // Picking "Mains" keeps Tandoori and Kottu on screen too.
+      (selectedSection ? c.parentId === selectedSection.id : false)
+    )
     .map((c) => ({ ...c, items: vegOnly ? c.items.filter((i) => i.isVegetarian) : c.items }))
     .filter((c) => c.items.length > 0);
 
@@ -893,9 +948,18 @@ export function MenuClient({
     return m;
   }, [cart]);
 
-  const sidebarEntries = [
-    { id: "all", name: "All Items", count: allItems.length },
-    ...categories.map((c) => ({ id: c.id, name: c.name, count: c.items.length })),
+  const sidebarEntries: { id: string; name: string; count: number; depth: number }[] = [
+    { id: "all", name: "All Items", count: allItems.length, depth: 0 },
+    ...sections.flatMap((sec) => {
+      // A section's count includes its sub-sections, which is what a diner
+      // means by "how many mains are there".
+      const own = sec.items.length;
+      const total = own + sec.children.reduce((n, c) => n + c.items.length, 0);
+      return [
+        { id: sec.id, name: sec.name, count: total, depth: 0 },
+        ...sec.children.map((c) => ({ id: c.id, name: c.name, count: c.items.length, depth: 1 })),
+      ];
+    }),
   ];
 
   return (
@@ -966,14 +1030,18 @@ export function MenuClient({
                 <button
                   key={entry.id}
                   onClick={() => setActiveCat(entry.id)}
-                  className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-semibold border transition-colors"
+                  className={`w-full flex items-center gap-3 rounded-xl py-3 text-sm border transition-colors ${
+                    entry.depth > 0 ? "pl-8 pr-3.5 font-medium" : "px-3.5 font-semibold"
+                  }`}
                   style={
                     active
                       ? { borderColor: "var(--accent)", color: "var(--m-text)", background: "color-mix(in srgb, var(--accent) 12%, transparent)" }
                       : { borderColor: "transparent", color: "var(--m-dim)" }
                   }
                 >
-                  <span style={{ color: active ? "var(--accent)" : "var(--m-faint)" }}>{catIcon}</span>
+                  {entry.depth === 0 && (
+                    <span style={{ color: active ? "var(--accent)" : "var(--m-faint)" }}>{catIcon}</span>
+                  )}
                   <span className="flex-1 text-left truncate" style={poppins}>{entry.name}</span>
                   <span className="text-xs" style={{ color: "var(--m-faint)" }}>{entry.count}</span>
                 </button>
@@ -1068,6 +1136,31 @@ export function MenuClient({
                   <span className="hidden sm:inline"> View</span>
                 </button>
               ))}
+              <div className="relative order-first w-full sm:order-none sm:w-56">
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search dishes…"
+                  aria-label="Search dishes"
+                  className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none"
+                  style={{
+                    borderColor: searching ? "var(--accent)" : "var(--m-border)",
+                    background: "var(--m-surface)",
+                    color: "var(--m-text)",
+                  }}
+                />
+                {searching && (
+                  <button
+                    onClick={() => setQuery("")}
+                    aria-label="Clear search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold"
+                    style={{ color: "var(--m-faint)" }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               <button
                 onClick={() => setVegOnly((v) => !v)}
                 aria-pressed={vegOnly}
@@ -1101,21 +1194,96 @@ export function MenuClient({
             ))}
           </div>
 
-          {activeCat === "all" && !vegOnly && reelItems.length > 0 && (
+          {/* While searching, the reel and the section list step aside — a diner
+              hunting for one dish does not want to scroll past a video strip. */}
+          {!searching && activeCat === "all" && !vegOnly && reelItems.length > 0 && (
             <KitchenReel items={reelItems} currency={currency} onOpen={openItem} />
           )}
 
-          {visibleCategories.length === 0 && (
+          {searching && (
+            <section className="pt-8">
+              <h2 className="flex items-center gap-3 text-xl font-extrabold" style={display}>
+                {searchResults.length > 0
+                  ? `${searchResults.length} ${searchResults.length === 1 ? "dish" : "dishes"} matching “${query.trim()}”`
+                  : "Nothing matched"}
+                <span className="h-px flex-1" style={{ background: "var(--m-border)" }} aria-hidden />
+              </h2>
+
+              {searchResults.length === 0 ? (
+                <p className="py-14 text-center" style={{ color: "var(--m-faint)" }}>
+                  No dish matches “{query.trim()}”
+                  {vegOnly ? " in the vegetarian dishes" : ""}. Try a shorter word, or{" "}
+                  <button onClick={() => setQuery("")} className="font-semibold underline" style={{ color: "var(--accent)" }}>
+                    browse the full menu
+                  </button>
+                  .
+                </p>
+              ) : (
+                <div
+                  className={`mt-4 ${
+                    view === "grid"
+                      ? "grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4"
+                      : "grid gap-3 grid-cols-1 xl:grid-cols-2"
+                  }`}
+                >
+                  {searchResults.map(({ item, trail }) => (
+                    <div key={item.id}>
+                      <p
+                        className="mb-1 text-[11px] font-semibold uppercase tracking-wider"
+                        style={{ color: "var(--m-faint)" }}
+                      >
+                        {trail}
+                      </p>
+                      {view === "grid" ? (
+                        <DishCard
+                          item={item}
+                          currency={currency}
+                          soldOut={isSoldOut(item, now)}
+                          onOpen={() => openItem(item)}
+                          onQuickAdd={quickAddFor(item)}
+                          inCart={orderingEnabled ? (cartQty[item.id] ?? 0) : 0}
+                        />
+                      ) : (
+                        <DishRow
+                          item={item}
+                          currency={currency}
+                          soldOut={isSoldOut(item, now)}
+                          onOpen={() => openItem(item)}
+                          onQuickAdd={quickAddFor(item)}
+                          inCart={orderingEnabled ? (cartQty[item.id] ?? 0) : 0}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {!searching && visibleCategories.length === 0 && (
             <p className="text-center py-20" style={{ color: "var(--m-faint)" }}>
               {vegOnly ? "No vegetarian dishes in this section." : "This menu is being prepared. Check back soon."}
             </p>
           )}
 
-          {visibleCategories.map((cat) => {
+          {!searching && visibleCategories.map((cat) => {
             const open = categoryOpen(cat, now);
+            const parentName = cat.parentId
+              ? sections.find((sec) => sec.id === cat.parentId)?.name
+              : null;
             return (
-              <section key={cat.id} className="pt-9">
-                <h2 className="text-xl font-extrabold flex items-center gap-3" style={display}>
+              <section key={cat.id} className={parentName ? "pt-6" : "pt-9"}>
+                <h2
+                  className={`flex items-center gap-3 ${
+                    parentName ? "text-base font-bold" : "text-xl font-extrabold"
+                  }`}
+                  style={display}
+                >
+                  {parentName && (
+                    <span className="font-normal" style={{ color: "var(--m-faint)" }}>
+                      {parentName} ›
+                    </span>
+                  )}
                   {cat.name}
                   {cat.availableFrom && cat.availableTo && (
                     <span

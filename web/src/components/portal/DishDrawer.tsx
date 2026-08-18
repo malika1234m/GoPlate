@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { api, MenuItem, ModifierGroup } from "@/lib/portal";
+import { api, Category, MenuItem, ModifierGroup } from "@/lib/portal";
 import { Btn, Confirm, ErrorNote, Field, inputCls, Modal } from "@/components/portal/ui";
 
 /**
@@ -20,6 +20,7 @@ export type DraftGroup = {
 export function DishDrawer({
   restaurantId,
   categoryId,
+  categories = [],
   item,
   currencyFmt,
   onClose,
@@ -27,6 +28,8 @@ export function DishDrawer({
 }: {
   restaurantId: string;
   categoryId: string;
+  /** All sections, so an existing dish can be moved between them. */
+  categories?: Category[];
   item?: MenuItem;
   currencyFmt: (n: number) => string;
   onClose: () => void;
@@ -34,6 +37,11 @@ export function DishDrawer({
 }) {
   const isEdit = !!item;
   const [current, setCurrent] = useState<MenuItem | undefined>(item);
+  // Which section the dish belongs to. Editable on an existing dish so an
+  // owner reorganising a long menu can move dishes into new sub-sections
+  // instead of deleting and re-adding them — which would lose the 3D model,
+  // the photos and the option groups attached to the dish.
+  const [sectionId, setSectionId] = useState(item?.categoryId ?? categoryId);
   const [name, setName] = useState(item?.name ?? "");
   const [caption, setCaption] = useState(item?.caption ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
@@ -181,9 +189,9 @@ export function DishDrawer({
     };
     try {
       if (current) {
-        await api.updateItem(current.id, body);
+        await api.updateItem(current.id, { ...body, categoryId: sectionId });
       } else {
-        const { item: created } = await api.createItem(restaurantId, { categoryId, ...body });
+        const { item: created } = await api.createItem(restaurantId, { categoryId: sectionId, ...body });
         // Groups can only be attached once the dish has an id. If one fails we
         // keep the drawer open on the created dish rather than closing, so the
         // owner can see which groups landed instead of silently losing them.
@@ -250,6 +258,33 @@ export function DishDrawer({
             <input required inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="12.50" className={inputCls} />
           </Field>
         </div>
+        {categories.length > 1 && (
+          <Field label="Section" hint="Move this dish into a section or sub-section.">
+            <select
+              value={sectionId}
+              onChange={(e) => setSectionId(e.target.value)}
+              className={`${inputCls} cursor-pointer`}
+            >
+              {categories
+                // Sections first, each followed by its own sub-sections, so the
+                // dropdown reads in the same order as the menu itself.
+                .flatMap((c) =>
+                  c.parentId ? [] : [c, ...categories.filter((k) => k.parentId === c.id)]
+                )
+                .map((c) => {
+                  const parent = c.parentId
+                    ? categories.find((k) => k.id === c.parentId)?.name
+                    : null;
+                  return (
+                    <option key={c.id} value={c.id}>
+                      {parent ? `${parent} › ${c.name}` : c.name}
+                    </option>
+                  );
+                })}
+            </select>
+          </Field>
+        )}
+
         <Field label="Caption (optional)" hint="A short line under the name — “Our signature since day one”.">
           <input value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={160} className={inputCls} />
         </Field>
