@@ -154,7 +154,12 @@ export type Restaurant = {
   phone: string;
   currency: string;
   accentColor: string;
-  theme: "midnight" | "espresso" | "ivory";
+  /**
+   * Template id. Intentionally a plain string, not a union: the catalogue is
+   * served by /api/menu-themes, so pinning the values here would reject a new
+   * template until the app was rebuilt and re-released.
+   */
+  theme: string;
   layout: "list" | "grid";
   showReel: boolean;
   logoUrl: string;
@@ -236,6 +241,25 @@ export type Order = {
 
 /* ---------- Auth ---------- */
 
+
+/**
+ * A menu template as the server describes it. Deliberately fetched rather than
+ * hardcoded here: the palettes live in the web app's menu-themes.ts, and a copy
+ * on the phone would drift the moment a template is added or a colour changed.
+ */
+export type MenuTheme = {
+  id: string;
+  label: string;
+  tone: "dark" | "light";
+  display: "sans" | "serif";
+  note: string;
+  swatch: string;
+  suggestedAccent: string;
+  /** True when the owner's plan does not include this template. */
+  locked: boolean;
+  palette: { bg: string; surface: string; border: string; text: string; dim: string };
+};
+
 export const api = {
   register: (name: string, email: string, password: string) =>
     request<{ token: string; user: User }>("/api/auth/register", {
@@ -269,6 +293,12 @@ export const api = {
 
   getRestaurant: (id: string) =>
     request<{ restaurant: RestaurantFull }>(`/api/restaurants/${id}`),
+
+  /** Templates plus what this owner's plan unlocks. */
+  menuThemes: () =>
+    request<{ plan: string; canCustomiseAccent: boolean; themes: MenuTheme[] }>(
+      "/api/menu-themes"
+    ),
 
   updateRestaurant: (id: string, data: Partial<Restaurant>) =>
     request<{ restaurant: Restaurant }>(`/api/restaurants/${id}`, { method: "PATCH", body: data }),

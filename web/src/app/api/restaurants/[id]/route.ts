@@ -77,7 +77,14 @@ export async function PATCH(req: Request, { params }: Params) {
   const plan = planOf(user);
   const { theme, accentColor } = parsed.data;
 
-  if (theme && !canUseTheme(plan, theme)) {
+  /**
+   * Only a *change* is gated. Both clients send the whole settings form on
+   * every save, so checking the value alone would trap an owner who downgraded
+   * while on a paid template: each save would resend their current theme, get a
+   * 402, and they could never edit their phone number again. Downgrading keeps
+   * the look they had; it just stops them picking another paid one.
+   */
+  if (theme && theme !== restaurant.theme && !canUseTheme(plan, theme)) {
     return upgradeRequired(
       `The ${themeOf(theme).label} template is part of Starter. Upgrade to use it — your menu keeps its current look until then.`
     );

@@ -10,6 +10,7 @@ import { captureMedia, chooseSource } from "@/components/dish-form";
 import { useKeyboardPadding } from "@/lib/keyboard";
 import { currencyOptions } from "@/lib/currencies";
 import { colors, font, radius } from "@/lib/theme";
+import { TemplatePicker } from "@/components/template-picker";
 
 const ACCENT_PRESETS = [
   "#f0762e",
@@ -22,17 +23,13 @@ const ACCENT_PRESETS = [
   "#e85d2a",
 ];
 
-const THEMES = [
-  ["midnight", "Midnight", "#0b0d16"],
-  ["espresso", "Espresso", "#14100c"],
-  ["ivory", "Ivory", "#f3efe7"],
-] as const;
-
 export default function Settings() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [restaurant, setRestaurant] = useState<RestaurantFull | null>(null);
   const [saving, setSaving] = useState(false);
+  // Set from the templates endpoint; false until it answers so nothing flashes.
+  const [canCustomiseAccent, setCanCustomiseAccent] = useState(false);
   const [uploadingBrand, setUploadingBrand] = useState<"logo" | "cover" | null>(null);
   const [brandProgress, setBrandProgress] = useState(0);
   const keyboardPad = useKeyboardPadding();
@@ -230,18 +227,18 @@ export default function Settings() {
 
       <SectionHeader title="How customers see your menu" />
       <Card style={{ padding: 18 }}>
-        <Text style={styles.pickerLabel}>Theme</Text>
-        <View style={styles.chipRow}>
-          {THEMES.map(([value, label, swatch]) => (
-            <Chip
-              key={value}
-              label={label}
-              swatch={swatch}
-              active={restaurant.theme === value}
-              onPress={() => set({ theme: value })}
-            />
-          ))}
-        </View>
+        <Text style={styles.pickerLabel}>Template</Text>
+        <TemplatePicker
+          themeId={restaurant.theme}
+          accent={restaurant.accentColor}
+          onSelect={(id, suggestedAccent) =>
+            // On Basic the accent follows the template, matching the web
+            // settings screen — otherwise the two clients drift apart.
+            set(canCustomiseAccent ? { theme: id } : { theme: id, accentColor: suggestedAccent })
+          }
+          onAccent={(hex) => set({ accentColor: hex })}
+          onEntitlements={setCanCustomiseAccent}
+        />
 
         <Text style={[styles.pickerLabel, { marginTop: 18 }]}>Dish layout</Text>
         <View style={styles.chipRow}>
@@ -257,6 +254,8 @@ export default function Settings() {
           />
         </View>
 
+        {canCustomiseAccent ? (
+        <>
         <Text style={[styles.pickerLabel, { marginTop: 18 }]}>Accent color</Text>
         <View style={[styles.chipRow, { flexWrap: "wrap" }]}>
           {ACCENT_PRESETS.map((hex) => {
@@ -273,6 +272,8 @@ export default function Settings() {
             );
           })}
         </View>
+        </>
+        ) : null}
 
         <View style={[styles.switchRow, { marginTop: 18 }]}>
           <View style={{ flex: 1 }}>
