@@ -1,6 +1,7 @@
 "use client";
 
-import { MENU_THEMES, paletteOf } from "@/lib/menu-themes";
+import { MENU_THEMES, paletteOf, themeOf, canUseTheme } from "@/lib/menu-themes";
+import { canCustomiseAccent, type Plan } from "@/lib/plans";
 
 /**
  * Template chooser with a live preview.
@@ -9,22 +10,30 @@ import { MENU_THEMES, paletteOf } from "@/lib/menu-themes";
  * almost nothing about what their menu will look like, and the alternative is
  * save-then-open-the-menu-then-come-back for every option. This renders a real
  * dish card in the selected palette, with their accent and layout applied.
+ *
+ * Locked templates are shown rather than hidden. An owner who cannot see what
+ * Starter adds has no reason to move up, and hiding them makes the Basic plan
+ * look thin instead of deliberately simple.
  */
 export function TemplatePicker({
   themeId,
   accent,
   layout,
+  plan,
   onSelect,
   onAccent,
 }: {
   themeId: string;
   accent: string;
   layout: string;
+  plan: Plan;
   onSelect: (id: string) => void;
   onAccent: (hex: string) => void;
 }) {
-  const selected = MENU_THEMES.find((t) => t.id === themeId) ?? MENU_THEMES[0];
+  const selected = themeOf(themeId);
   const p = paletteOf(themeId);
+  const accentUnlocked = canCustomiseAccent(plan);
+  const displayFont = selected.display === "serif" ? "var(--font-fraunces)" : "var(--font-poppins)";
 
   const groups = [
     { tone: "dark" as const, label: "Dark" },
@@ -38,27 +47,57 @@ export function TemplatePicker({
           <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-faint">
             {g.label}
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             {MENU_THEMES.filter((t) => t.tone === g.tone).map((t) => {
               const active = t.id === themeId;
+              const locked = !canUseTheme(plan, t.id);
               return (
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => onSelect(t.id)}
+                  onClick={() => !locked && onSelect(t.id)}
                   aria-pressed={active}
-                  className="flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-bold transition-colors"
+                  aria-disabled={locked}
+                  title={locked ? "Available on Starter" : undefined}
+                  className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
+                    locked ? "cursor-not-allowed opacity-55" : ""
+                  }`}
                   style={
                     active
-                      ? { borderColor: "var(--accent)", color: "var(--accent)" }
-                      : { borderColor: "var(--navy-700)", color: "var(--ink-dim)" }
+                      ? { borderColor: "var(--accent)" }
+                      : { borderColor: "var(--navy-700)" }
                   }
                 >
                   <span
-                    className="h-4 w-4 rounded-full border"
+                    className="mt-0.5 h-8 w-8 shrink-0 rounded-lg border"
                     style={{ background: t.swatch, borderColor: "var(--navy-700)" }}
                   />
-                  {t.label}
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className="text-sm font-bold"
+                        style={{ color: active ? "var(--accent)" : "var(--ink)" }}
+                      >
+                        {t.label}
+                      </span>
+                      {t.display === "serif" && (
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink-faint border border-navy-700">
+                          Serif
+                        </span>
+                      )}
+                      {locked && (
+                        <span
+                          className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                          style={{ background: "rgba(240,118,46,0.16)", color: "var(--accent)" }}
+                        >
+                          Starter
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-snug text-ink-dim">
+                      {t.note}
+                    </span>
+                  </span>
                 </button>
               );
             })}
@@ -66,13 +105,24 @@ export function TemplatePicker({
         </div>
       ))}
 
+      {!accentUnlocked && (
+        <p
+          className="rounded-xl border px-4 py-3 text-xs leading-relaxed"
+          style={{ borderColor: "rgba(240,118,46,0.3)", background: "rgba(240,118,46,0.06)", color: "var(--ink-dim)" }}
+        >
+          On <span className="font-bold text-ink">Basic</span> your menu uses the colours that come
+          with each template — they are chosen to stay readable in a dim room. Starter unlocks the
+          styled templates and your own accent colour.
+        </p>
+      )}
+
       {/* Live preview — a real card, not a colour chip */}
       <div>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-bold uppercase tracking-wider text-ink-faint">
             Preview — {selected.label}
           </p>
-          {accent.toLowerCase() !== selected.suggestedAccent.toLowerCase() && (
+          {accentUnlocked && accent.toLowerCase() !== selected.suggestedAccent.toLowerCase() && (
             <button
               type="button"
               onClick={() => onAccent(selected.suggestedAccent)}
@@ -92,7 +142,10 @@ export function TemplatePicker({
           style={{ background: p["--m-bg"], borderColor: p["--m-border"] }}
         >
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm font-extrabold" style={{ color: p["--m-text"] }}>
+            <span
+              className="text-base font-extrabold"
+              style={{ color: p["--m-text"], fontFamily: displayFont }}
+            >
               Your Restaurant
             </span>
             <span className="text-[11px] font-semibold" style={{ color: accent }}>
@@ -100,9 +153,14 @@ export function TemplatePicker({
             </span>
           </div>
 
-          <div
-            className={`mt-3 gap-3 ${layout === "grid" ? "grid grid-cols-2" : "flex flex-col"}`}
+          <p
+            className="mt-2.5 text-sm font-extrabold"
+            style={{ color: p["--m-text"], fontFamily: displayFont }}
           >
+            Starters
+          </p>
+
+          <div className={`mt-2 gap-3 ${layout === "grid" ? "grid grid-cols-2" : "flex flex-col"}`}>
             {[
               { name: "Charred Ribeye", price: "28.00", desc: "Rosemary butter, vine tomatoes." },
               { name: "Garden Salad", price: "7.00", desc: "Heirloom tomato, herb vinaigrette." },

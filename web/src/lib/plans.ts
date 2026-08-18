@@ -30,6 +30,22 @@ export const PLANS: Record<
 
 export const PLAN_IDS: Plan[] = ["basic", "starter", "pro"];
 
+/**
+ * Ordering used to gate features that get richer as the plan does.
+ * Kept as a number rather than comparing plan names so a new tier slots in
+ * without rewriting every comparison.
+ */
+export const PLAN_TIER: Record<Plan, number> = { basic: 0, starter: 1, pro: 2 };
+
+/**
+ * Free choice of accent colour is a paid feature — and a quality control.
+ * On Basic the accent follows the template, which stops a menu going out in
+ * neon magenta on a black background and looking like nobody designed it.
+ */
+export function canCustomiseAccent(plan: Plan): boolean {
+  return PLAN_TIER[plan] >= PLAN_TIER.starter;
+}
+
 export function isPlan(value: string): value is Plan {
   return (PLAN_IDS as string[]).includes(value);
 }

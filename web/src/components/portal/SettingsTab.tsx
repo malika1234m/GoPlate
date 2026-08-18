@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Restaurant } from "@/lib/portal";
 import { Btn, Confirm, CurrencySelect, ErrorNote, Field, inputCls } from "@/components/portal/ui";
 import { TemplatePicker } from "@/components/portal/TemplatePicker";
+import { canCustomiseAccent, type Plan } from "@/lib/plans";
+import { MENU_THEMES } from "@/lib/menu-themes";
 
 export function SettingsTab({
   restaurant,
@@ -30,6 +32,23 @@ export function SettingsTab({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // The picker needs to know what the owner is entitled to. Fetched here rather
+  // than threaded through the page, so Settings stays self-contained.
+  const [plan, setPlan] = useState<Plan>("basic");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const b = await api.billing();
+        if (!cancelled) setPlan(b.plan);
+      } catch {
+        // Fall back to Basic: showing fewer options is the safe failure.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   const save = async (e: React.FormEvent) => {
@@ -131,7 +150,15 @@ export function SettingsTab({
             themeId={theme}
             accent={accent}
             layout={layout}
-            onSelect={setTheme}
+            plan={plan}
+            onSelect={(id) => {
+              setTheme(id);
+              // On Basic the accent follows the template, so it must move with it.
+              if (!canCustomiseAccent(plan)) {
+                const t = MENU_THEMES.find((x) => x.id === id);
+                if (t) setAccent(t.suggestedAccent);
+              }
+            }}
             onAccent={setAccent}
           />
 
@@ -154,7 +181,10 @@ export function SettingsTab({
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-3 text-sm text-ink-dim">
+            <label
+              className="flex items-center gap-3 text-sm text-ink-dim"
+              style={canCustomiseAccent(plan) ? undefined : { display: "none" }}
+            >
               Accent color
               <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} className="h-9 w-14 cursor-pointer rounded-lg border border-navy-700 bg-navy-800" />
               <span className="text-xs text-ink-faint">{accent}</span>

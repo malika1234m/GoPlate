@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
 import { MenuBootOverlay } from "./MenuBootOverlay";
-import { paletteOf } from "@/lib/menu-themes";
+import { paletteOf, displayFontOf } from "@/lib/menu-themes";
 import { OrderCart, CartLine, cartKey } from "./OrderCart";
 
 export type PublicModifierOption = {
@@ -818,6 +818,8 @@ export function MenuClient({
 }) {
   const currency = useCurrency(restaurant.currency);
   const theme = paletteOf(restaurant.theme);
+  // Templates choose their headline face; body copy stays on the UI font.
+  const display = { fontFamily: displayFontOf(restaurant.theme) };
 
   const categories = restaurant.categories.filter((c) => c.items.length > 0);
   const allItems = categories.flatMap((c) => c.items);
@@ -928,7 +930,7 @@ export function MenuClient({
               />
             )}
             <span className="min-w-0">
-              <span className="block text-lg font-extrabold truncate" style={poppins}>
+              <span className="block text-lg font-extrabold truncate" style={display}>
                 {restaurant.name}
               </span>
               {restaurant.caption && (
@@ -1021,7 +1023,7 @@ export function MenuClient({
           {/* Heading + view controls */}
           <div className="pt-8 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold" style={poppins}>
+              <h1 className="text-3xl sm:text-4xl font-extrabold" style={display}>
                 Our Full Menu
               </h1>
               <p className="mt-1 text-sm" style={{ color: "var(--m-faint)" }}>
@@ -1113,7 +1115,7 @@ export function MenuClient({
             const open = categoryOpen(cat, now);
             return (
               <section key={cat.id} className="pt-9">
-                <h2 className="text-xl font-extrabold flex items-center gap-3" style={poppins}>
+                <h2 className="text-xl font-extrabold flex items-center gap-3" style={display}>
                   {cat.name}
                   {cat.availableFrom && cat.availableTo && (
                     <span

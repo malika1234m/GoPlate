@@ -12,6 +12,8 @@
  * the pair that actually decides whether a description is legible.
  */
 
+import { PLAN_TIER, type Plan } from "./plans";
+
 export type MenuPalette = {
   "--m-bg": string;
   "--m-surface": string;
@@ -28,10 +30,25 @@ export type MenuTheme = {
   label: string;
   /** Grouped in the picker so an owner sees light and dark options separately. */
   tone: "dark" | "light";
+  /**
+   * Headline typeface. Colour alone does not make a menu look designed — a
+   * cream background under a geometric sans still reads like a web app, while
+   * the same palette under a serif reads like a printed restaurant menu. This
+   * picks between the two faces the site already loads, so no template adds a
+   * font download.
+   */
+  display: "sans" | "serif";
+  /** A word on who the template suits, shown under its name in the picker. */
+  note: string;
   /** Shown in the picker; the background colour is what an owner recognises. */
   swatch: string;
   /** Reads well with this template — offered as a one-tap suggestion. */
   suggestedAccent: string;
+  /**
+   * Lowest plan tier that may select it. The neutral templates are available to
+   * everyone; the styled ones are part of what a Starter subscription buys.
+   */
+  minTier: number;
   palette: MenuPalette;
 };
 
@@ -40,8 +57,11 @@ export const MENU_THEMES: MenuTheme[] = [
     id: "midnight",
     label: "Midnight",
     tone: "dark",
+    display: "sans",
+    note: "Clean and neutral. Works for any cuisine.",
     swatch: "#070708",
     suggestedAccent: "#f0762e",
+    minTier: 0,
     palette: {
       "--m-bg": "#070708",
       "--m-surface": "#121214",
@@ -57,8 +77,11 @@ export const MENU_THEMES: MenuTheme[] = [
     id: "espresso",
     label: "Espresso",
     tone: "dark",
+    display: "sans",
+    note: "Warm and low-lit. Suits coffee shops and grills.",
     swatch: "#14100c",
     suggestedAccent: "#e0a34a",
+    minTier: 1,
     palette: {
       "--m-bg": "#14100c",
       "--m-surface": "#1c1610",
@@ -74,8 +97,11 @@ export const MENU_THEMES: MenuTheme[] = [
     id: "charcoal",
     label: "Charcoal",
     tone: "dark",
+    display: "sans",
+    note: "Cool and understated. Good for modern kitchens.",
     swatch: "#141619",
     suggestedAccent: "#5fb3d6",
+    minTier: 0,
     palette: {
       "--m-bg": "#141619",
       "--m-surface": "#1d2025",
@@ -91,8 +117,11 @@ export const MENU_THEMES: MenuTheme[] = [
     id: "forest",
     label: "Forest",
     tone: "dark",
+    display: "sans",
+    note: "Calm and earthy. Suits vegetarian and farm menus.",
     swatch: "#0d1712",
     suggestedAccent: "#7fc08a",
+    minTier: 1,
     palette: {
       "--m-bg": "#0d1712",
       "--m-surface": "#13201a",
@@ -108,8 +137,11 @@ export const MENU_THEMES: MenuTheme[] = [
     id: "wine",
     label: "Wine",
     tone: "dark",
+    display: "serif",
+    note: "Deep and formal. Suits wine bars and fine dining.",
     swatch: "#170b10",
     suggestedAccent: "#e08a6a",
+    minTier: 1,
     palette: {
       "--m-bg": "#170b10",
       "--m-surface": "#211018",
@@ -125,8 +157,11 @@ export const MENU_THEMES: MenuTheme[] = [
     id: "harbour",
     label: "Harbour",
     tone: "dark",
+    display: "sans",
+    note: "Cool navy. Suits seafood and coastal menus.",
     swatch: "#0b1220",
     suggestedAccent: "#f0a83e",
+    minTier: 1,
     palette: {
       "--m-bg": "#0b1220",
       "--m-surface": "#111a2b",
@@ -142,8 +177,11 @@ export const MENU_THEMES: MenuTheme[] = [
     id: "ivory",
     label: "Ivory",
     tone: "light",
+    display: "sans",
+    note: "Bright and simple. Good for cafés and bakeries.",
     swatch: "#f8f4ec",
     suggestedAccent: "#c2410c",
+    minTier: 0,
     palette: {
       "--m-bg": "#f8f4ec",
       "--m-surface": "#ffffff",
@@ -159,8 +197,11 @@ export const MENU_THEMES: MenuTheme[] = [
     id: "paper",
     label: "Paper",
     tone: "light",
+    display: "sans",
+    note: "Crisp and minimal. Suits fast casual and takeaway.",
     swatch: "#f5f6f8",
     suggestedAccent: "#1f6feb",
+    minTier: 1,
     palette: {
       "--m-bg": "#f5f6f8",
       "--m-surface": "#ffffff",
@@ -176,8 +217,11 @@ export const MENU_THEMES: MenuTheme[] = [
     id: "sage",
     label: "Sage",
     tone: "light",
+    display: "sans",
+    note: "Soft and fresh. Suits brunch and health food.",
     swatch: "#eef2ec",
     suggestedAccent: "#3f7d4f",
+    minTier: 1,
     palette: {
       "--m-bg": "#eef2ec",
       "--m-surface": "#ffffff",
@@ -187,6 +231,66 @@ export const MENU_THEMES: MenuTheme[] = [
       "--m-dim": "#4f5b4f",
       "--m-faint": "#828d81",
       "--m-scrim": "rgba(238,242,236,0.97)",
+    },
+  },
+  {
+    id: "trattoria",
+    label: "Trattoria",
+    tone: "light",
+    display: "serif",
+    note: "Printed-menu look. Made for Italian and Mediterranean.",
+    swatch: "#faf6ef",
+    suggestedAccent: "#a4161a",
+    minTier: 1,
+    palette: {
+      "--m-bg": "#faf6ef",
+      "--m-surface": "#ffffff",
+      "--m-raised": "#f2ebdd",
+      "--m-border": "#e3d9c6",
+      "--m-text": "#1f1a14",
+      "--m-dim": "#584e40",
+      "--m-faint": "#8c8272",
+      "--m-scrim": "rgba(250,246,239,0.97)",
+    },
+  },
+  {
+    id: "ristorante",
+    label: "Ristorante",
+    tone: "dark",
+    display: "serif",
+    note: "Candlelit and formal. Made for evening dining.",
+    swatch: "#100d0b",
+    suggestedAccent: "#c9a227",
+    minTier: 1,
+    palette: {
+      "--m-bg": "#100d0b",
+      "--m-surface": "#191512",
+      "--m-raised": "#241e19",
+      "--m-border": "#342b23",
+      "--m-text": "#f6f1e8",
+      "--m-dim": "#c5b9a8",
+      "--m-faint": "#8d8274",
+      "--m-scrim": "rgba(16,13,11,0.97)",
+    },
+  },
+  {
+    id: "ceylon",
+    label: "Ceylon",
+    tone: "light",
+    display: "serif",
+    note: "Warm and spiced. Made for South Asian kitchens.",
+    swatch: "#fbf4ea",
+    suggestedAccent: "#b5551d",
+    minTier: 1,
+    palette: {
+      "--m-bg": "#fbf4ea",
+      "--m-surface": "#ffffff",
+      "--m-raised": "#f4e8d8",
+      "--m-border": "#e6d5bd",
+      "--m-text": "#231a11",
+      "--m-dim": "#5b4a37",
+      "--m-faint": "#8e7c66",
+      "--m-scrim": "rgba(251,244,234,0.97)",
     },
   },
 ];
@@ -210,4 +314,27 @@ export function isMenuTheme(value: string): boolean {
 
 export function paletteOf(themeId: string): MenuPalette {
   return MENU_PALETTES[themeId] ?? MENU_PALETTES[DEFAULT_THEME_ID];
+}
+
+export function themeOf(themeId: string): MenuTheme {
+  return MENU_THEMES.find((t) => t.id === themeId) ?? MENU_THEMES[0];
+}
+
+/** Which display font a template asks for, as a CSS variable reference. */
+export function displayFontOf(themeId: string): string {
+  return themeOf(themeId).display === "serif"
+    ? "var(--font-fraunces)"
+    : "var(--font-poppins)";
+}
+
+/**
+ * Whether a plan may select a template. Enforced on the server as well as in
+ * the picker — a locked template is a paid feature, not a UI hint.
+ */
+export function canUseTheme(plan: Plan, themeId: string): boolean {
+  return PLAN_TIER[plan] >= themeOf(themeId).minTier;
+}
+
+export function themesForPlan(plan: Plan): MenuTheme[] {
+  return MENU_THEMES.filter((t) => PLAN_TIER[plan] >= t.minTier);
 }

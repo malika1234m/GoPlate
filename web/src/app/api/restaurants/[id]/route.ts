@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { isMenuTheme } from "@/lib/menu-themes";
+import { isMenuTheme, canUseTheme, themeOf } from "@/lib/menu-themes";
 import { prisma } from "@/lib/db";
 import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
-import { accessExpired } from "@/lib/plans";
+import { accessExpired, planOf, canCustomiseAccent, upgradeRequired } from "@/lib/plans";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -69,6 +69,29 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!parsed.success) {
     return Response.json({ error: "Invalid input" }, { status: 400 });
   }
+  /**
+   * Template and accent are plan-gated, and the check has to live here rather
+   * than only in the picker: the picker greys options out, but the API is what
+   * actually stops a hand-rolled request from taking a paid template for free.
+   */
+  const plan = planOf(user);
+  const { theme, accentColor } = parsed.data;
+
+  if (theme && !canUseTheme(plan, theme)) {
+    return upgradeRequired(
+      `The ${themeOf(theme).label} template is part of Starter. Upgrade to use it — your menu keeps its current look until then.`
+    );
+  }
+  if (
+    accentColor &&
+    accentColor.toLowerCase() !== restaurant.accentColor.toLowerCase() &&
+    !canCustomiseAccent(plan)
+  ) {
+    return upgradeRequired(
+      "Choosing your own accent colour is part of Starter. On Basic the colour follows the template you pick."
+    );
+  }
+
   const updated = await prisma.restaurant.update({
     where: { id },
     data: parsed.data,
