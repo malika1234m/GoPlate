@@ -174,6 +174,12 @@ export type Category = {
   sortOrder: number;
   availableFrom: string;
   availableTo: string;
+  /**
+   * Null for a top-level section; otherwise the section this sits inside
+   * (Mains → Kottu, Desserts → Mousses). Without it the phone renders
+   * sub-sections as if they were top-level, which is not what the diner sees.
+   */
+  parentId: string | null;
   items: MenuItem[];
 };
 
@@ -320,10 +326,10 @@ export const api = {
 
   /* ---------- Categories ---------- */
 
-  createCategory: (restaurantId: string, name: string) =>
+  createCategory: (restaurantId: string, name: string, parentId?: string | null) =>
     request<{ category: Category }>(`/api/restaurants/${restaurantId}/categories`, {
       method: "POST",
-      body: { name },
+      body: { name, parentId: parentId ?? null },
     }),
 
   updateCategory: (

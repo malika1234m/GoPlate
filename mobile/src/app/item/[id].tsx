@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, MenuItem } from "@/lib/api";
+import { api, Category, MenuItem } from "@/lib/api";
 import { handleUpgradeError } from "@/lib/upgrade";
 import { currencySymbol } from "@/lib/currencies";
 import { useKeyboardPadding } from "@/lib/keyboard";
-import { Badge, BadgeTone, Button, Card, IconCircle } from "@/components/ui";
+import { Badge, BadgeTone, Button, Card, IconCircle, Select } from "@/components/ui";
 import { ScreenLoader } from "@/components/loading-screen";
 import { ModifierEditor } from "@/components/modifier-editor";
 import {
@@ -19,7 +19,10 @@ import {
 } from "@/components/dish-form";
 import { colors, font } from "@/lib/theme";
 
-function modelBadge(status: MenuItem["modelStatus"]): { label: string; tone: BadgeTone } {
+function modelBadge(status: MenuItem["modelStatus"]): {
+  label: string;
+  tone: BadgeTone;
+} {
   if (status === "READY") return { label: "LIVE ON MENU", tone: "success" };
   if (status === "PROCESSING") return { label: "BUILDING…", tone: "accent" };
   if (status === "FAILED") return { label: "FAILED", tone: "danger" };
@@ -88,6 +91,33 @@ export default function EditDish() {
     return stopPolling;
   }, [id, router, startPolling, stopPolling]);
 
+  /**
+   * Sections available to move this dish into. Fetched here because the edit
+   * screen is opened straight from a dish and never sees the restaurant's
+   * category list otherwise — without this an owner reorganising a menu would
+   * have to delete and re-add the dish, losing its 3D model and photos.
+   */
+  const [sections, setSections] = useState<Category[]>([]);
+  const [sectionId, setSectionId] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!item?.restaurantId) return;
+      try {
+        const { restaurant } = await api.getRestaurant(item.restaurantId);
+        if (!cancelled) {
+          setSections(restaurant.categories);
+          setSectionId(item.categoryId);
+        }
+      } catch {
+        // Leave the picker hidden rather than blocking the whole edit screen.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [item?.restaurantId, item?.categoryId]);
+
   if (!item || !draft) return <ScreenLoader label="Loading dish…" />;
 
   const onChange = (patch: Partial<DishDraft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
@@ -110,6 +140,7 @@ export default function EditDish() {
         isVegetarian: draft.isVegetarian,
         isSpicy: draft.isSpicy,
         isAvailable: draft.isAvailable,
+        ...(sectionId && sectionId !== item?.categoryId ? { categoryId: sectionId } : {}),
       });
       router.back();
     } catch (err) {
@@ -121,13 +152,19 @@ export default function EditDish() {
 
   const generate3d = async () => {
     if (!draft.imageUrl) {
-      Alert.alert("Photo needed", "Add a photo of the dish first — it is used to build the 3D model.");
+      Alert.alert(
+        "Photo needed",
+        "Add a photo of the dish first — it is used to build the 3D model."
+      );
       return;
     }
     setGenerating(true);
     try {
       // Persist any unsaved media before kicking off generation
-      await api.updateItem(id, { imageUrl: draft.imageUrl, videoUrl: draft.videoUrl });
+      await api.updateItem(id, {
+        imageUrl: draft.imageUrl,
+        videoUrl: draft.videoUrl,
+      });
       const { item: updated } = await api.generate3d(id);
       setItem(updated);
       startPolling();
@@ -185,7 +222,10 @@ export default function EditDish() {
               const { item: updated } = await api.delete3d(id);
               setItem(updated);
             } catch (err) {
-              Alert.alert("Something went wrong", err instanceof Error ? err.message : "Check your connection and try again.");
+              Alert.alert(
+                "Something went wrong",
+                err instanceof Error ? err.message : "Check your connection and try again."
+              );
             }
           },
         },
@@ -198,7 +238,10 @@ export default function EditDish() {
       const { item: updated } = await api.updateItem(id, { storyVideoUrl: "" });
       setItem(updated);
     } catch (err) {
-      Alert.alert("Something went wrong", err instanceof Error ? err.message : "Check your connection and try again.");
+      Alert.alert(
+        "Something went wrong",
+        err instanceof Error ? err.message : "Check your connection and try again."
+      );
     }
   };
 
@@ -213,7 +256,10 @@ export default function EditDish() {
             await api.deleteItem(id);
             router.back();
           } catch (err) {
-            Alert.alert("Something went wrong", err instanceof Error ? err.message : "Check your connection and try again.");
+            Alert.alert(
+              "Something went wrong",
+              err instanceof Error ? err.message : "Check your connection and try again."
+            );
           }
         },
       },
@@ -225,7 +271,10 @@ export default function EditDish() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 48 + keyboardPad }}
+      contentContainerStyle={{
+        padding: 16,
+        paddingBottom: insets.bottom + 48 + keyboardPad,
+      }}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
@@ -252,9 +301,7 @@ export default function EditDish() {
         </Text>
         {item.modelStatus === "PROCESSING" ? (
           <View style={styles.progressTrack}>
-            <View
-              style={[styles.progressFill, { width: `${Math.max(6, progress ?? 6)}%` }]}
-            />
+            <View style={[styles.progressFill, { width: `${Math.max(6, progress ?? 6)}%` }]} />
           </View>
         ) : (
           <>
@@ -320,6 +367,30 @@ export default function EditDish() {
         ) : null}
       </Card>
 
+      {sections.length > 1 ? (
+        <Card style={{ padding: 18, marginBottom: 14 }}>
+          <Select
+            label="Section"
+            hint="Move this dish into a section or sub-section."
+            value={sectionId}
+            onChange={setSectionId}
+            options={sections
+              // Sections first, each followed by its own sub-sections, so the
+              // list reads in the same order as the menu.
+              .flatMap((c) =>
+                c.parentId ? [] : [c, ...sections.filter((k) => k.parentId === c.id)]
+              )
+              .map((c) => {
+                const parent = c.parentId ? sections.find((k) => k.id === c.parentId)?.name : null;
+                return {
+                  value: c.id,
+                  label: parent ? `${parent} \u203a ${c.name}` : c.name,
+                };
+              })}
+          />
+        </Card>
+      ) : null}
+
       <DishForm
         draft={draft}
         onChange={onChange}
@@ -333,7 +404,10 @@ export default function EditDish() {
             setItem(updated);
             setDraft((d) => (d ? { ...d, [kind === "image" ? "imageUrl" : "videoUrl"]: "" } : d));
           } catch (err) {
-            Alert.alert("Something went wrong", err instanceof Error ? err.message : "Check your connection and try again.");
+            Alert.alert(
+              "Something went wrong",
+              err instanceof Error ? err.message : "Check your connection and try again."
+            );
           }
         }}
       />
@@ -383,5 +457,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     overflow: "hidden",
   },
-  progressFill: { height: "100%", borderRadius: 3, backgroundColor: colors.accent },
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: colors.accent,
+  },
 });

@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import { api, API_URL } from "@/lib/api";
@@ -13,10 +21,16 @@ type Billing = Awaited<ReturnType<typeof api.billing>>;
 // payments policy for in-app digital purchases.
 const ACCOUNT_URL = `${API_URL}/account`;
 
+type Period = "monthly" | "yearly";
+
+// Yearly is twelve months for the price of ten — the same numbers the website
+// charges (web/src/lib/plans.ts). Kept in sync by hand because the mobile app
+// only ever displays them; the actual purchase happens on the web.
 const PLANS: {
   id: PlanId;
   name: string;
-  price: string;
+  priceUsd: number;
+  priceYearlyUsd: number;
   tagline: string;
   popular?: boolean;
   features: string[];
@@ -24,7 +38,8 @@ const PLANS: {
   {
     id: "basic",
     name: "Basic",
-    price: "$2",
+    priceUsd: 2,
+    priceYearlyUsd: 20,
     tagline: "Your menu, live and looking good",
     features: [
       "1 restaurant",
@@ -37,7 +52,8 @@ const PLANS: {
   {
     id: "starter",
     name: "Starter",
-    price: "$12",
+    priceUsd: 12,
+    priceYearlyUsd: 120,
     tagline: "Bring your best dishes to life",
     popular: true,
     features: [
@@ -50,7 +66,8 @@ const PLANS: {
   {
     id: "pro",
     name: "Pro",
-    price: "$29",
+    priceUsd: 29,
+    priceYearlyUsd: 290,
     tagline: "The full 3D experience, plus live ordering",
     features: [
       "Everything in Starter",
@@ -63,10 +80,15 @@ const PLANS: {
   },
 ];
 
+const SAVING_PERCENT = Math.floor(
+  ((PLANS[1].priceUsd * 12 - PLANS[1].priceYearlyUsd) / (PLANS[1].priceUsd * 12)) * 100
+);
+
 export default function Plans() {
   const insets = useSafeAreaInsets();
   const [billing, setBilling] = useState<Billing | null>(null);
   const [opening, setOpening] = useState(false);
+  const [period, setPeriod] = useState<Period>("monthly");
 
   const loadBilling = () => {
     api
@@ -140,8 +162,8 @@ export default function Plans() {
           {billing?.subscribed ? "Manage your subscription" : "Upgrade on our website"}
         </Text>
         <Text style={styles.webBody}>
-          Plans and secure payment are handled on the GoPlate website. Sign in with this same account
-          to choose or change your plan.
+          Plans and secure payment are handled on the GoPlate website. Sign in with this same
+          account to choose or change your plan.
         </Text>
         <Button
           title={billing?.subscribed ? "Manage on the web" : "Upgrade on the web"}
@@ -149,6 +171,31 @@ export default function Plans() {
           loading={opening}
         />
       </Card>
+
+      {/* Monthly / yearly. Display only — payment still happens on the web. */}
+      <View style={styles.periodToggle}>
+        {(["monthly", "yearly"] as Period[]).map((p) => {
+          const on = period === p;
+          return (
+            <Pressable
+              key={p}
+              onPress={() => setPeriod(p)}
+              style={[styles.periodOption, on && styles.periodOptionOn]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+            >
+              <Text style={[styles.periodLabel, on && styles.periodLabelOn]}>
+                {p === "monthly" ? "Monthly" : "Yearly"}
+              </Text>
+              {p === "yearly" && (
+                <Text style={[styles.periodSave, on && styles.periodSaveOn]}>
+                  −{SAVING_PERCENT}%
+                </Text>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
 
       {PLANS.map((plan) => {
         const isCurrent = billing?.subscribed && billing.plan === plan.id;
@@ -172,20 +219,23 @@ export default function Plans() {
               </View>
               <View style={{ alignItems: "flex-end" }}>
                 <Text style={styles.planPrice} allowFontScaling={false}>
-                  {plan.price}
+                  ${period === "yearly" ? plan.priceYearlyUsd : plan.priceUsd}
                 </Text>
-                <Text style={styles.planPeriod}>per month</Text>
+                <Text style={styles.planPeriod}>
+                  {period === "yearly" ? "per year" : "per month"}
+                </Text>
+                {period === "yearly" && (
+                  <Text style={styles.planPeriodNote}>
+                    ${(plan.priceYearlyUsd / 12).toFixed(2)}/mo
+                  </Text>
+                )}
               </View>
             </View>
 
             <View style={styles.features}>
               {plan.features.map((f) => (
                 <View key={f} style={styles.featureRow}>
-                  <Icon
-                    name="check"
-                    size={16}
-                    color={plan.popular ? colors.accent : colors.sky}
-                  />
+                  <Icon name="check" size={16} color={plan.popular ? colors.accent : colors.sky} />
                   <Text style={styles.featureText}>{f}</Text>
                 </View>
               ))}
@@ -216,6 +266,39 @@ export default function Plans() {
 }
 
 const styles = StyleSheet.create({
+  periodToggle: {
+    flexDirection: "row",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: 4,
+    marginBottom: 16,
+  },
+  periodOption: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+  },
+  periodOptionOn: { backgroundColor: colors.accent },
+  periodLabel: {
+    color: colors.textDim,
+    fontSize: 14,
+    fontFamily: font.semibold,
+  },
+  periodLabelOn: { color: "#fff" },
+  periodSave: { color: colors.success, fontSize: 11.5, fontFamily: font.bold },
+  periodSaveOn: { color: "#fff" },
+  planPeriodNote: {
+    color: colors.textFaint,
+    fontSize: 11,
+    fontFamily: font.regular,
+    marginTop: 2,
+  },
   trialCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -259,10 +342,19 @@ const styles = StyleSheet.create({
     fontFamily: font.regular,
   },
   planPrice: { color: colors.accent, fontSize: 28, fontFamily: font.heavy },
-  planPeriod: { color: colors.textFaint, fontSize: 11.5, fontFamily: font.regular },
+  planPeriod: {
+    color: colors.textFaint,
+    fontSize: 11.5,
+    fontFamily: font.regular,
+  },
   features: { marginTop: 14, marginBottom: 16, gap: 9 },
   featureRow: { flexDirection: "row", alignItems: "center", gap: 9 },
-  featureText: { color: colors.textDim, fontSize: 13.5, fontFamily: font.regular, flex: 1 },
+  featureText: {
+    color: colors.textDim,
+    fontSize: 13.5,
+    fontFamily: font.regular,
+    flex: 1,
+  },
   currentPlan: {
     flexDirection: "row",
     alignItems: "center",
@@ -272,7 +364,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     backgroundColor: colors.successSoft,
   },
-  currentPlanText: { color: colors.success, fontSize: 14, fontFamily: font.bold },
+  currentPlanText: {
+    color: colors.success,
+    fontSize: 14,
+    fontFamily: font.bold,
+  },
   finePrint: {
     color: colors.textFaint,
     fontSize: 12,

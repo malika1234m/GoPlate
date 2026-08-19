@@ -87,12 +87,26 @@ export default function MenuEditor() {
     load().finally(() => setRefreshing(false));
   }, [load]);
 
+  /**
+   * When set, the "New category" card creates a sub-section inside this
+   * section instead of a top-level one. Mirrors the web dashboard so an owner
+   * building the same menu on either device gets the same structure.
+   */
+  const [newCatParent, setNewCatParent] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  // Finding one dish in a long menu on a phone is a lot of scrolling. Filtering
+  // is local — the whole menu is already loaded, so it stays instant offline.
+  const [query, setQuery] = useState("");
+
   const addCategory = async () => {
     if (!newCategory.trim()) return;
     setAddingCategory(true);
     try {
-      await api.createCategory(id, newCategory.trim());
+      await api.createCategory(id, newCategory.trim(), newCatParent?.id ?? null);
       setNewCategory("");
+      setNewCatParent(null);
       await load();
     } catch (err) {
       Alert.alert("Could not add category", err instanceof Error ? err.message : "Try again");
@@ -107,7 +121,10 @@ export default function MenuEditor() {
     const { availableFrom, availableTo } = renaming;
     const scheduled = availableFrom || availableTo;
     if (scheduled && (!TIME.test(availableFrom) || !TIME.test(availableTo))) {
-      Alert.alert("Check the times", "Use 24h HH:MM format, e.g. 11:00 to 16:00 — or pick a preset.");
+      Alert.alert(
+        "Check the times",
+        "Use 24h HH:MM format, e.g. 11:00 to 16:00 — or pick a preset."
+      );
       return;
     }
     try {
@@ -134,9 +151,7 @@ export default function MenuEditor() {
             ...r,
             categories: r.categories.map((c) => ({
               ...c,
-              items: c.items.map((i) =>
-                i.id === item.id ? { ...i, soldOutDate: optimistic } : i
-              ),
+              items: c.items.map((i) => (i.id === item.id ? { ...i, soldOutDate: optimistic } : i)),
             })),
           }
         : r
@@ -144,30 +159,72 @@ export default function MenuEditor() {
     try {
       await api.updateItem(item.id, { soldOutToday: !soldOut });
     } catch (err) {
-      Alert.alert("Something went wrong", err instanceof Error ? err.message : "Check your connection and try again.");
+      Alert.alert(
+        "Something went wrong",
+        err instanceof Error ? err.message : "Check your connection and try again."
+      );
     }
     load();
   };
 
   const removeCategory = (categoryId: string, name: string) => {
-    Alert.alert("Delete category", `Delete “${name}” and all dishes in it?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.deleteCategory(categoryId);
-          } catch (err) {
-            Alert.alert("Something went wrong", err instanceof Error ? err.message : "Check your connection and try again.");
-          }
-          load();
+    // Deleting a section takes its sub-sections and their dishes with it, so
+    // say exactly how much is about to go — the cascade is not obvious.
+    const subs = restaurant?.categories.filter((c) => c.parentId === categoryId) ?? [];
+    const dishes =
+      (restaurant?.categories.find((c) => c.id === categoryId)?.items.length ?? 0) +
+      subs.reduce((n, c) => n + c.items.length, 0);
+    const detail = [
+      subs.length ? `${subs.length} sub-section${subs.length === 1 ? "" : "s"}` : "",
+      dishes ? `${dishes} dish${dishes === 1 ? "" : "es"}` : "",
+    ].filter(Boolean);
+
+    Alert.alert(
+      "Delete section",
+      detail.length
+        ? `Delete “${name}”? This also removes ${detail.join(" and ")}. This can’t be undone.`
+        : `Delete “${name}”?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.deleteCategory(categoryId);
+            } catch (err) {
+              Alert.alert(
+                "Something went wrong",
+                err instanceof Error ? err.message : "Check your connection and try again."
+              );
+            }
+            load();
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   if (!restaurant) return <ScreenLoader label="Loading your menu…" />;
+
+  const q = query.trim().toLowerCase();
+  /** Dishes in a section that match the current search (all of them when idle). */
+  const matchingItems = (cat: { items: MenuItem[] }) =>
+    q
+      ? cat.items.filter(
+          (i) =>
+            i.name.toLowerCase().includes(q) ||
+            i.caption.toLowerCase().includes(q) ||
+            i.description.toLowerCase().includes(q)
+        )
+      : cat.items;
+
+  // Sections first, each followed by its own sub-sections, so the list reads in
+  // the same order the diner sees on the menu.
+  const orderedCategories = restaurant.categories.flatMap((c) =>
+    c.parentId ? [] : [c, ...restaurant.categories.filter((k) => k.parentId === c.id)]
+  );
+  const matchCount = orderedCategories.reduce((n, c) => n + matchingItems(c).length, 0);
 
   const onAction = (to: "orders" | "qr" | "preview" | "settings") => {
     if (to === "orders") router.push(`/restaurant/${id}/orders`);
@@ -186,11 +243,7 @@ export default function MenuEditor() {
           paddingBottom: insets.bottom + 48 + keyboardPad,
         }}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.accent}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
         }
         keyboardShouldPersistTaps="handled"
       >
@@ -210,6 +263,28 @@ export default function MenuEditor() {
           ))}
         </View>
 
+        {/* Dish search — only worth the space once the menu is long enough. */}
+        {restaurant.categories.some((c) => c.items.length > 0) ? (
+          <View style={{ marginBottom: 4 }}>
+            <Input
+              placeholder="Search dishes…"
+              value={query}
+              onChangeText={setQuery}
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
+            {q ? (
+              <Text style={styles.searchNote}>
+                {matchCount === 0
+                  ? `No dishes match “${query.trim()}”.`
+                  : `${matchCount} dish${matchCount === 1 ? "" : "es"} match “${query.trim()}”.`}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {restaurant.categories.length === 0 && (
           <EmptyState
             icon="restaurant_menu"
@@ -218,139 +293,182 @@ export default function MenuEditor() {
           />
         )}
 
-        {restaurant.categories.map((cat) => (
-          <View key={cat.id} style={{ marginBottom: 26 }}>
-            <View style={styles.catHeader}>
-              <View style={styles.catTitleWrap}>
-                <View style={styles.catTick} />
-                <Text style={styles.catName}>{cat.name}</Text>
-                <Text style={styles.catCount}>{cat.items.length}</Text>
-                {cat.availableFrom && cat.availableTo ? (
-                  <View style={styles.timeChip}>
-                    <Icon name="schedule" size={12} color={colors.sky} />
-                    <Text style={styles.timeChipText} allowFontScaling={false}>
-                      {cat.availableFrom}–{cat.availableTo}
+        {orderedCategories
+          // While searching, hide sections with nothing matching so the answer
+          // is not buried between empty headings.
+          .filter((cat) => !q || matchingItems(cat).length > 0)
+          .map((cat) => (
+            <View
+              key={cat.id}
+              style={[
+                { marginBottom: 26 },
+                cat.parentId
+                  ? {
+                      marginLeft: 14,
+                      paddingLeft: 12,
+                      borderLeftWidth: 1,
+                      borderLeftColor: colors.border,
+                    }
+                  : null,
+              ]}
+            >
+              <View style={styles.catHeader}>
+                <View style={styles.catTitleWrap}>
+                  <View style={styles.catTick} />
+                  <Text style={styles.catName}>{cat.name}</Text>
+                  <Text style={styles.catCount}>{matchingItems(cat).length}</Text>
+                  {cat.availableFrom && cat.availableTo ? (
+                    <View style={styles.timeChip}>
+                      <Icon name="schedule" size={12} color={colors.sky} />
+                      <Text style={styles.timeChipText} allowFontScaling={false}>
+                        {cat.availableFrom}–{cat.availableTo}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {!cat.parentId ? (
+                    <Pressable
+                      onPress={() => setNewCatParent({ id: cat.id, name: cat.name })}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Add a sub-section inside ${cat.name}`}
+                      style={styles.iconBtn}
+                    >
+                      <Icon name="add" size={18} color={colors.textDim} />
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    onPress={() =>
+                      setRenaming({
+                        id: cat.id,
+                        name: cat.name,
+                        availableFrom: cat.availableFrom ?? "",
+                        availableTo: cat.availableTo ?? "",
+                      })
+                    }
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit category ${cat.name}`}
+                    style={styles.iconBtn}
+                  >
+                    <Icon name="edit" size={16} color={colors.textDim} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => removeCategory(cat.id, cat.name)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete category ${cat.name}`}
+                    style={styles.iconBtn}
+                  >
+                    <Icon name="delete" size={16} color={colors.textFaint} />
+                  </Pressable>
+                </View>
+              </View>
+
+              {matchingItems(cat).map((item) => {
+                const status = statusBadge(item);
+                const soldOut = item.soldOutDate === localToday();
+                return (
+                  <Pressable key={item.id} onPress={() => router.push(`/item/${item.id}`)}>
+                    {({ pressed }) => (
+                      <Card
+                        style={[styles.itemCard, pressed && { borderColor: colors.borderLight }]}
+                      >
+                        <View style={styles.thumb}>
+                          {item.imageUrl ? (
+                            <Image
+                              source={{ uri: mediaUrl(item.imageUrl) }}
+                              style={{ width: "100%", height: "100%" }}
+                            />
+                          ) : (
+                            <Icon name="image" size={22} color={colors.textFaint} />
+                          )}
+                        </View>
+                        <View style={{ flex: 1, gap: 4 }}>
+                          <Text style={styles.itemName} numberOfLines={1}>
+                            {item.name}
+                            {!item.isAvailable && (
+                              <Text style={{ color: colors.textFaint }}> (hidden)</Text>
+                            )}
+                          </Text>
+                          <Badge label={status.text} tone={status.tone} />
+                        </View>
+                        <View style={{ alignItems: "flex-end", gap: 8 }}>
+                          <Text style={styles.price} allowFontScaling={false}>
+                            {formatPrice(item.price, restaurant.currency)}
+                          </Text>
+                          <Pressable
+                            onPress={() => toggleSoldOut(item)}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: soldOut }}
+                            accessibilityLabel={
+                              soldOut
+                                ? `${item.name} is sold out today. Tap to put it back on the menu.`
+                                : `Mark ${item.name} sold out for today`
+                            }
+                            style={[styles.soldOutPill, soldOut && styles.soldOutPillActive]}
+                          >
+                            <Text
+                              style={[styles.soldOutText, soldOut && { color: "#fff" }]}
+                              allowFontScaling={false}
+                            >
+                              {soldOut ? "Sold out" : "In stock"}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </Card>
+                    )}
+                  </Pressable>
+                );
+              })}
+
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/item/new",
+                    params: {
+                      restaurantId: id,
+                      categoryId: cat.id,
+                      currency: restaurant.currency,
+                    },
+                  })
+                }
+              >
+                {({ pressed }) => (
+                  <View style={[styles.addDish, pressed && { borderColor: colors.accent }]}>
+                    <Icon name="add" size={18} color={colors.accent} />
+                    <Text style={styles.addDishText} allowFontScaling={false}>
+                      Add dish to {cat.name}
                     </Text>
                   </View>
-                ) : null}
-              </View>
-              <View style={{ flexDirection: "row", gap: 6 }}>
-                <Pressable
-                  onPress={() =>
-                    setRenaming({
-                      id: cat.id,
-                      name: cat.name,
-                      availableFrom: cat.availableFrom ?? "",
-                      availableTo: cat.availableTo ?? "",
-                    })
-                  }
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Edit category ${cat.name}`}
-                  style={styles.iconBtn}
-                >
-                  <Icon name="edit" size={16} color={colors.textDim} />
-                </Pressable>
-                <Pressable
-                  onPress={() => removeCategory(cat.id, cat.name)}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Delete category ${cat.name}`}
-                  style={styles.iconBtn}
-                >
-                  <Icon name="delete" size={16} color={colors.textFaint} />
-                </Pressable>
-              </View>
+                )}
+              </Pressable>
             </View>
-
-            {cat.items.map((item) => {
-              const status = statusBadge(item);
-              const soldOut = item.soldOutDate === localToday();
-              return (
-                <Pressable key={item.id} onPress={() => router.push(`/item/${item.id}`)}>
-                  {({ pressed }) => (
-                    <Card
-                      style={[styles.itemCard, pressed && { borderColor: colors.borderLight }]}
-                    >
-                      <View style={styles.thumb}>
-                        {item.imageUrl ? (
-                          <Image
-                            source={{ uri: mediaUrl(item.imageUrl) }}
-                            style={{ width: "100%", height: "100%" }}
-                          />
-                        ) : (
-                          <Icon name="image" size={22} color={colors.textFaint} />
-                        )}
-                      </View>
-                      <View style={{ flex: 1, gap: 4 }}>
-                        <Text style={styles.itemName} numberOfLines={1}>
-                          {item.name}
-                          {!item.isAvailable && (
-                            <Text style={{ color: colors.textFaint }}>  (hidden)</Text>
-                          )}
-                        </Text>
-                        <Badge label={status.text} tone={status.tone} />
-                      </View>
-                      <View style={{ alignItems: "flex-end", gap: 8 }}>
-                        <Text style={styles.price} allowFontScaling={false}>
-                          {formatPrice(item.price, restaurant.currency)}
-                        </Text>
-                        <Pressable
-                          onPress={() => toggleSoldOut(item)}
-                          hitSlop={8}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: soldOut }}
-                          accessibilityLabel={
-                            soldOut
-                              ? `${item.name} is sold out today. Tap to put it back on the menu.`
-                              : `Mark ${item.name} sold out for today`
-                          }
-                          style={[styles.soldOutPill, soldOut && styles.soldOutPillActive]}
-                        >
-                          <Text
-                            style={[styles.soldOutText, soldOut && { color: "#fff" }]}
-                            allowFontScaling={false}
-                          >
-                            {soldOut ? "Sold out" : "In stock"}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    </Card>
-                  )}
-                </Pressable>
-              );
-            })}
-
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/item/new",
-                  params: { restaurantId: id, categoryId: cat.id, currency: restaurant.currency },
-                })
-              }
-            >
-              {({ pressed }) => (
-                <View style={[styles.addDish, pressed && { borderColor: colors.accent }]}>
-                  <Icon name="add" size={18} color={colors.accent} />
-                  <Text style={styles.addDishText} allowFontScaling={false}>
-                    Add dish to {cat.name}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-          </View>
-        ))}
+          ))}
 
         {/* Add category */}
         <Card style={{ padding: 18 }}>
           <Input
-            label="New category"
+            label={newCatParent ? `New sub-section in ${newCatParent.name}` : "New category"}
             value={newCategory}
             onChangeText={setNewCategory}
-            placeholder="e.g. Starters"
+            placeholder={newCatParent ? "e.g. Kottu" : "e.g. Starters"}
           />
+          {newCatParent ? (
+            <Pressable
+              onPress={() => setNewCatParent(null)}
+              hitSlop={8}
+              style={{ paddingBottom: 10 }}
+            >
+              <Text style={styles.parentHint}>
+                Going inside {newCatParent.name} — tap to make it a top-level section instead.
+              </Text>
+            </Pressable>
+          ) : null}
           <Button
-            title="Add category"
+            title={newCatParent ? "Add sub-section" : "Add category"}
             icon="add"
             variant="secondary"
             onPress={addCategory}
@@ -369,57 +487,63 @@ export default function MenuEditor() {
         onRequestClose={() => setRenaming(null)}
       >
         {renaming && (
-        <View style={[styles.overlay, { paddingBottom: 24 + keyboardPad }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setRenaming(null)} />
-          <Card style={{ width: "100%", padding: 18 }}>
-            <Input
-              label="Category name"
-              value={renaming.name}
-              onChangeText={(v) => setRenaming({ ...renaming, name: v })}
-              autoFocus
-            />
-            <Text style={styles.scheduleLabel}>Served during</Text>
-            <View style={styles.presetRow}>
-              {SCHEDULE_PRESETS.map(([label, from, to]) => (
-                <Chip
-                  key={label}
-                  label={label}
-                  active={renaming.availableFrom === from && renaming.availableTo === to}
-                  onPress={() => setRenaming({ ...renaming, availableFrom: from, availableTo: to })}
-                />
-              ))}
-            </View>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <Input
-                  label="From"
-                  value={renaming.availableFrom}
-                  onChangeText={(v) => setRenaming({ ...renaming, availableFrom: v })}
-                  placeholder="11:00"
-                  autoCapitalize="none"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Input
-                  label="To"
-                  value={renaming.availableTo}
-                  onChangeText={(v) => setRenaming({ ...renaming, availableTo: v })}
-                  placeholder="16:00"
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <Button
-                title="Cancel"
-                variant="ghost"
-                style={{ flex: 1 }}
-                onPress={() => setRenaming(null)}
+          <View style={[styles.overlay, { paddingBottom: 24 + keyboardPad }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setRenaming(null)} />
+            <Card style={{ width: "100%", padding: 18 }}>
+              <Input
+                label="Category name"
+                value={renaming.name}
+                onChangeText={(v) => setRenaming({ ...renaming, name: v })}
+                autoFocus
               />
-              <Button title="Save" style={{ flex: 1 }} onPress={saveCategory} />
-            </View>
-          </Card>
-        </View>
+              <Text style={styles.scheduleLabel}>Served during</Text>
+              <View style={styles.presetRow}>
+                {SCHEDULE_PRESETS.map(([label, from, to]) => (
+                  <Chip
+                    key={label}
+                    label={label}
+                    active={renaming.availableFrom === from && renaming.availableTo === to}
+                    onPress={() =>
+                      setRenaming({
+                        ...renaming,
+                        availableFrom: from,
+                        availableTo: to,
+                      })
+                    }
+                  />
+                ))}
+              </View>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Input
+                    label="From"
+                    value={renaming.availableFrom}
+                    onChangeText={(v) => setRenaming({ ...renaming, availableFrom: v })}
+                    placeholder="11:00"
+                    autoCapitalize="none"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Input
+                    label="To"
+                    value={renaming.availableTo}
+                    onChangeText={(v) => setRenaming({ ...renaming, availableTo: v })}
+                    placeholder="16:00"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Button
+                  title="Cancel"
+                  variant="ghost"
+                  style={{ flex: 1 }}
+                  onPress={() => setRenaming(null)}
+                />
+                <Button title="Save" style={{ flex: 1 }} onPress={saveCategory} />
+              </View>
+            </Card>
+          </View>
         )}
       </Modal>
     </>
@@ -435,16 +559,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: radius.lg,
   },
-  actionLabel: { color: colors.textDim, fontSize: 12.5, fontFamily: font.semibold },
+  actionLabel: {
+    color: colors.textDim,
+    fontSize: 12.5,
+    fontFamily: font.semibold,
+  },
   catHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
   },
-  catTitleWrap: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1, flexWrap: "wrap" },
-  catTick: { width: 4, height: 18, borderRadius: 2, backgroundColor: colors.accent },
+  catTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+    flexWrap: "wrap",
+  },
+  catTick: {
+    width: 4,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: colors.accent,
+  },
   catName: { color: colors.text, fontSize: 19, fontFamily: font.heavy },
+  parentHint: {
+    color: colors.accent,
+    fontFamily: font.semibold,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  searchNote: {
+    color: colors.textDim,
+    fontSize: 12.5,
+    fontFamily: font.regular,
+    marginTop: -6,
+    marginBottom: 12,
+  },
   catCount: {
     color: colors.textFaint,
     fontSize: 12,
@@ -506,7 +658,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 2,
   },
-  addDishText: { color: colors.accent, fontSize: 13.5, fontFamily: font.semibold },
+  addDishText: {
+    color: colors.accent,
+    fontSize: 13.5,
+    fontFamily: font.semibold,
+  },
   overlay: {
     position: "absolute",
     inset: 0,
@@ -522,13 +678,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 6,
   },
-  soldOutPillActive: { backgroundColor: colors.danger, borderColor: colors.danger },
-  soldOutText: { fontSize: 11.5, fontFamily: font.bold, color: colors.textFaint },
+  soldOutPillActive: {
+    backgroundColor: colors.danger,
+    borderColor: colors.danger,
+  },
+  soldOutText: {
+    fontSize: 11.5,
+    fontFamily: font.bold,
+    color: colors.textFaint,
+  },
   scheduleLabel: {
     color: colors.textDim,
     fontSize: 13,
     fontFamily: font.semibold,
     marginBottom: 8,
   },
-  presetRow: { flexDirection: "row", gap: 8, marginBottom: 14, flexWrap: "wrap" },
+  presetRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+    flexWrap: "wrap",
+  },
 });
