@@ -7,7 +7,7 @@ import { AuthDivider, GoogleButton } from "@/components/portal/GoogleButton";
 import { PasswordInput } from "@/components/portal/ui";
 import { UpgradeRequestPanel, SupportPanel } from "@/components/account/OwnerRequests";
 import { useSearchParams } from "next/navigation";
-import { PLANS, priceFor, type BillingPeriod } from "@/lib/plans";
+import { PLANS, priceFor, yearlySavingPercent, type BillingPeriod } from "@/lib/plans";
 
 /**
  * Owner-facing web billing. Subscriptions are handled here (on the web),
@@ -370,7 +370,47 @@ export function AccountClient({ googleClientId = "" }: { googleClientId?: string
             )}
 
             {/* Plan chooser */}
-            <h2 className="mt-14 text-2xl font-extrabold text-ink">{billing.subscribed ? "Switch plan" : "Choose a plan"}</h2>
+            <div className="mt-14 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-2xl font-extrabold text-ink">
+                {billing.subscribed ? "Switch plan" : "Choose a plan"}
+              </h2>
+              {/* A second copy of the period control, next to the prices it
+                  changes. The request form above has one too, but by the time
+                  an owner has scrolled down to the cards it is off-screen —
+                  and a price with no visible way to change it just reads as
+                  "monthly only". Both drive the same state. */}
+              <div
+                role="group"
+                aria-label="Billing period"
+                className="inline-flex rounded-full border p-1"
+                style={{ borderColor: "var(--navy-700)" }}
+              >
+                {(["monthly", "yearly"] as BillingPeriod[]).map((pd) => {
+                  const on = period === pd;
+                  return (
+                    <button
+                      key={pd}
+                      type="button"
+                      onClick={() => setPeriod(pd)}
+                      aria-pressed={on}
+                      className="rounded-full px-4 py-1.5 text-xs font-bold capitalize transition-colors"
+                      style={
+                        on
+                          ? { background: "linear-gradient(100deg, var(--accent), #f5934f)", color: "#fff" }
+                          : { color: "var(--ink-dim)" }
+                      }
+                    >
+                      {pd}
+                      {pd === "yearly" && (
+                        <span className={`ml-1.5 ${on ? "text-white/90" : "text-accent"}`}>
+                          −{yearlySavingPercent()}%
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div className="mt-6 grid gap-5 md:grid-cols-3 items-stretch">
               {PLAN_CARDS.map((p) => {
                 const isCurrent = billing.subscribed && billing.plan === p.id;
