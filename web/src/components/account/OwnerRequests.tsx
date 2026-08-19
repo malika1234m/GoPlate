@@ -39,12 +39,16 @@ export function UpgradeRequestPanel({
   token,
   selectedPlan,
   onSelectPlan,
+  period,
+  onSelectPeriod,
 }: {
   token: string;
   selectedPlan: Plan;
   onSelectPlan: (p: Plan) => void;
+  /** Owned by AccountClient so the plan cards above show the same prices. */
+  period: BillingPeriod;
+  onSelectPeriod: (p: BillingPeriod) => void;
 }) {
-  const [period, setPeriod] = useState<BillingPeriod>("monthly");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [note, setNote] = useState("");
@@ -159,7 +163,7 @@ export function UpgradeRequestPanel({
               <button
                 key={pd}
                 type="button"
-                onClick={() => setPeriod(pd)}
+                onClick={() => onSelectPeriod(pd)}
                 aria-pressed={period === pd}
                 className="rounded-full border px-4 py-2 text-xs font-bold capitalize transition-colors"
                 style={

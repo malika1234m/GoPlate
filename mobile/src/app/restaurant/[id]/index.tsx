@@ -279,7 +279,9 @@ export default function MenuEditor() {
               <Text style={styles.searchNote}>
                 {matchCount === 0
                   ? `No dishes match “${query.trim()}”.`
-                  : `${matchCount} dish${matchCount === 1 ? "" : "es"} match “${query.trim()}”.`}
+                  : matchCount === 1
+                    ? `1 dish matches “${query.trim()}”.`
+                    : `${matchCount} dishes match “${query.trim()}”.`}
               </Text>
             ) : null}
           </View>

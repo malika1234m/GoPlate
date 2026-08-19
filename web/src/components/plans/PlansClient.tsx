@@ -4,16 +4,16 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Reveal } from "@/components/home/Dynamic";
+import { PLANS, priceFor, yearlySavingPercent, type BillingPeriod, type Plan } from "@/lib/plans";
 
-/* ---------- Content (facts mirror src/lib/plans.ts and the app's gates) ---------- */
+/* ---------- Content (feature lists mirror the app's gates; prices come from
+   src/lib/plans.ts so this page cannot drift from what we actually charge) ---------- */
 
 const plans = [
   {
-    id: "basic",
+    id: "basic" as Plan,
     name: "Basic",
     tagline: "Your menu, live today",
-    price: "$2",
-    period: "per month",
     highlight: false,
     cta: { label: "Start free month", href: "/register" },
     features: [
@@ -25,11 +25,9 @@ const plans = [
     ],
   },
   {
-    id: "starter",
+    id: "starter" as Plan,
     name: "Starter",
     tagline: "Bring your best dishes to life",
-    price: "$12",
-    period: "per month",
     highlight: true,
     cta: { label: "Sign in to upgrade", href: "/account" },
     features: [
@@ -40,11 +38,9 @@ const plans = [
     ],
   },
   {
-    id: "pro",
+    id: "pro" as Plan,
     name: "Pro",
     tagline: "The full 3D experience, plus live ordering",
-    price: "$29",
-    period: "per month",
     highlight: false,
     cta: { label: "Sign in to upgrade", href: "/account" },
     features: [
@@ -239,6 +235,11 @@ function Faq() {
 /* ---------- Page ---------- */
 
 export function PlansClient() {
+  // Monthly by default: the headline number a first-time visitor compares is
+  // the monthly one, and the yearly saving reads as a discount off it.
+  const [period, setPeriod] = useState<BillingPeriod>("monthly");
+  const saving = yearlySavingPercent();
+
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden" style={{ fontFamily: "var(--font-poppins)" }}>
       <style>{`
@@ -313,8 +314,42 @@ export function PlansClient() {
           </p>
         </section>
 
+        {/* Billing period */}
+        <section className="mt-10 flex justify-center">
+          <div
+            role="group"
+            aria-label="Billing period"
+            className="inline-flex rounded-full border border-navy-700 bg-navy-900/70 p-1"
+          >
+            {(["monthly", "yearly"] as BillingPeriod[]).map((pd) => {
+              const on = period === pd;
+              return (
+                <button
+                  key={pd}
+                  type="button"
+                  onClick={() => setPeriod(pd)}
+                  aria-pressed={on}
+                  className="rounded-full px-5 py-2 text-sm font-semibold transition-colors"
+                  style={
+                    on
+                      ? { background: "linear-gradient(100deg, var(--accent), #f5934f)", color: "#fff" }
+                      : { color: "var(--ink-dim)" }
+                  }
+                >
+                  {pd === "monthly" ? "Monthly" : "Yearly"}
+                  {pd === "yearly" && (
+                    <span className={`ml-2 text-xs font-bold ${on ? "text-white/90" : "text-accent"}`}>
+                      Save {saving}%
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         {/* Plan cards */}
-        <section className="mt-14 sm:mt-20 grid gap-6 lg:gap-8 md:grid-cols-3 max-w-5xl mx-auto items-stretch">
+        <section className="mt-10 sm:mt-14 grid gap-6 lg:gap-8 md:grid-cols-3 max-w-5xl mx-auto items-stretch">
           {plans.map((plan) => (
             <Reveal key={plan.id} className="h-full">
               <div className="relative h-full">
@@ -330,9 +365,19 @@ export function PlansClient() {
                   <p className="text-sm font-bold uppercase tracking-[0.18em] text-ink-dim">{plan.name}</p>
                   <p className="mt-1 text-sm text-ink-faint">{plan.tagline}</p>
                   <p className="mt-5 flex items-baseline gap-2">
-                    <span className="text-5xl font-extrabold text-ink">{plan.price}</span>
-                    <span className="text-sm font-medium text-ink-faint">/ {plan.period}</span>
+                    <span className="text-5xl font-extrabold text-ink">
+                      ${priceFor(plan.id, period)}
+                    </span>
+                    <span className="text-sm font-medium text-ink-faint">
+                      / {period === "yearly" ? "per year" : "per month"}
+                    </span>
                   </p>
+                  {period === "yearly" && (
+                    <p className="mt-1.5 text-xs text-ink-faint">
+                      ${(PLANS[plan.id].priceYearlyUsd / 12).toFixed(2)}/mo, billed once a year —
+                      two months free.
+                    </p>
+                  )}
                   <ul className="mt-7 space-y-3.5">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-start gap-3 text-sm text-ink-dim">
@@ -342,7 +387,14 @@ export function PlansClient() {
                     ))}
                   </ul>
                   <Link
-                    href={plan.cta.href}
+                    // Carry the chosen period so the upgrade form opens on the
+                    // same one — picking "Yearly" here and landing on a monthly
+                    // form is the kind of small betrayal that loses the sale.
+                    href={
+                      period === "yearly" && plan.cta.href === "/account"
+                        ? "/account?period=yearly"
+                        : plan.cta.href
+                    }
                     className="mt-9 inline-flex w-full items-center justify-center gap-2.5 rounded-full px-6 py-3.5 text-sm font-bold tracking-wide transition-colors"
                     style={
                       plan.highlight

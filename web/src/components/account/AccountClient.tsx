@@ -6,6 +6,8 @@ import Link from "next/link";
 import { AuthDivider, GoogleButton } from "@/components/portal/GoogleButton";
 import { PasswordInput } from "@/components/portal/ui";
 import { UpgradeRequestPanel, SupportPanel } from "@/components/account/OwnerRequests";
+import { useSearchParams } from "next/navigation";
+import { PLANS, priceFor, type BillingPeriod } from "@/lib/plans";
 
 /**
  * Owner-facing web billing. Subscriptions are handled here (on the web),
@@ -32,7 +34,6 @@ const TOKEN_KEY = "goplate_token";
 const PLAN_CARDS: {
   id: Plan;
   name: string;
-  price: string;
   tagline: string;
   highlight?: boolean;
   features: string[];
@@ -40,14 +41,12 @@ const PLAN_CARDS: {
   {
     id: "basic",
     name: "Basic",
-    price: "$2",
     tagline: "Your menu, live and looking good",
     features: ["1 restaurant", "Unlimited dishes & photos", "2 dish videos", "2 photoreal 3D models", "QR code & custom themes"],
   },
   {
     id: "starter",
     name: "Starter",
-    price: "$12",
     tagline: "Bring your best dishes to life",
     highlight: true,
     features: ["Everything in Basic", "Up to 10 dish videos", "Up to 10 photoreal 3D models", "AR — dishes on the table"],
@@ -55,7 +54,6 @@ const PLAN_CARDS: {
   {
     id: "pro",
     name: "Pro",
-    price: "$29",
     tagline: "The full 3D experience, plus live ordering",
     features: ["Everything in Starter", "Unlimited videos & 3D models", "Live table ordering", "Kitchen orders screen", "Up to 10 restaurants"],
   },
@@ -72,6 +70,15 @@ export function AccountClient({ googleClientId = "" }: { googleClientId?: string
   const [token, setToken] = useState<string | null>(null);
   // Shared between the plan cards and the request form below them.
   const [requestPlan, setRequestPlan] = useState<Plan>("starter");
+  /**
+   * Billing period lives here rather than inside the request panel because the
+   * plan cards above it show prices too — split state would let the cards say
+   * "$12 / mo" while the form underneath was set to yearly.
+   * The pricing page links in as ?period=yearly so the choice carries over.
+   */
+  const [period, setPeriod] = useState<BillingPeriod>(
+    useSearchParams().get("period") === "yearly" ? "yearly" : "monthly"
+  );
   const [billing, setBilling] = useState<Billing | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
@@ -357,6 +364,8 @@ export function AccountClient({ googleClientId = "" }: { googleClientId?: string
                 token={token}
                 selectedPlan={requestPlan}
                 onSelectPlan={setRequestPlan}
+                period={period}
+                onSelectPeriod={setPeriod}
               />
             )}
 
@@ -382,9 +391,18 @@ export function AccountClient({ googleClientId = "" }: { googleClientId?: string
                     <p className="text-sm font-bold uppercase tracking-[0.16em] text-ink-dim">{p.name}</p>
                     <p className="mt-1 text-xs text-ink-faint">{p.tagline}</p>
                     <p className="mt-4 flex items-baseline gap-1.5">
-                      <span className="text-4xl font-extrabold text-ink">{p.price}</span>
-                      <span className="text-sm text-ink-faint">/ mo</span>
+                      <span className="text-4xl font-extrabold text-ink">
+                        ${priceFor(p.id, period)}
+                      </span>
+                      <span className="text-sm text-ink-faint">
+                        / {period === "yearly" ? "yr" : "mo"}
+                      </span>
                     </p>
+                    {period === "yearly" && (
+                      <p className="mt-1 text-xs text-ink-faint">
+                        ${(PLANS[p.id].priceYearlyUsd / 12).toFixed(2)}/mo, billed yearly
+                      </p>
+                    )}
                     <ul className="mt-5 space-y-2.5 flex-1">
                       {p.features.map((f) => (
                         <li key={f} className="flex items-start gap-2.5 text-sm text-ink-dim">
