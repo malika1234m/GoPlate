@@ -136,8 +136,21 @@ export type Order = {
 export type Billing = {
   plan: "basic" | "starter" | "pro";
   label: string;
-  limits: { maxRestaurants: number; maxModels: number; maxVideos: number };
-  usage: { restaurants: number; models: number; videos: number };
+  limits: {
+    maxRestaurants: number;
+    maxModels: number;
+    maxVideos: number;
+    modelsPerMonth: number;
+    videosPerMonth: number;
+  };
+  usage: {
+    restaurants: number;
+    models: number;
+    videos: number;
+    /** Built this calendar month — the spend meter, not the library count. */
+    modelsThisMonth: number;
+    videosThisMonth: number;
+  };
   subscribed: boolean;
   trialDaysLeft: number;
   accessActive: boolean;

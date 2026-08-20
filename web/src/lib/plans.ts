@@ -25,13 +25,40 @@ export const PLANS: Record<
      */
     priceYearlyUsd: number;
     maxRestaurants: number;
+    /**
+     * How many dishes may carry a 3D model / video at once. This is the number
+     * the pricing page sells: "2 photoreal 3D models" means two dishes in 3D.
+     */
     maxModels: number;
     maxVideos: number;
+    /**
+     * How many may be *generated* per calendar month. Separate from the caps
+     * above because those limit inventory and this limits spend: regenerating
+     * a dish, or deleting one and building another, costs us a paid call to
+     * the 3D provider every time while leaving the inventory count unchanged.
+     * Set comfortably above the inventory cap so redoing a model you dislike
+     * is normal, and only sustained abuse hits the ceiling.
+     */
+    modelsPerMonth: number;
+    videosPerMonth: number;
   }
 > = {
-  basic: { label: "Basic", priceLabel: "$2/mo", priceUsd: 2, priceYearlyUsd: 20, maxRestaurants: 1, maxModels: 2, maxVideos: 2 },
-  starter: { label: "Starter", priceLabel: "$12/mo", priceUsd: 12, priceYearlyUsd: 120, maxRestaurants: 1, maxModels: 10, maxVideos: 10 },
-  pro: { label: "Pro", priceLabel: "$29/mo", priceUsd: 29, priceYearlyUsd: 290, maxRestaurants: 10, maxModels: -1, maxVideos: -1 },
+  basic: {
+    label: "Basic", priceLabel: "$2/mo", priceUsd: 2, priceYearlyUsd: 20,
+    maxRestaurants: 1, maxModels: 2, maxVideos: 2, modelsPerMonth: 6, videosPerMonth: 6,
+  },
+  starter: {
+    label: "Starter", priceLabel: "$12/mo", priceUsd: 12, priceYearlyUsd: 120,
+    maxRestaurants: 1, maxModels: 10, maxVideos: 10, modelsPerMonth: 25, videosPerMonth: 25,
+  },
+  // Pro was "unlimited". A 200-dish menu meant 200 paid generations and an
+  // open-ended transcode bill against $29/month, so it is now a ceiling high
+  // enough that no real restaurant reaches it — a 100-dish menu is still
+  // "your entire menu in 3D" — while capping what a single account can cost.
+  pro: {
+    label: "Pro", priceLabel: "$29/mo", priceUsd: 29, priceYearlyUsd: 290,
+    maxRestaurants: 10, maxModels: 100, maxVideos: 100, modelsPerMonth: 150, videosPerMonth: 150,
+  },
 };
 
 export const PLAN_IDS: Plan[] = ["basic", "starter", "pro"];
@@ -134,6 +161,50 @@ export async function countVideos(ownerId: string): Promise<number> {
       OR: [{ NOT: { videoUrl: "" } }, { NOT: { storyVideoUrl: "" } }],
     },
   });
+}
+
+/* ---------------- Monthly generation allowance ---------------- */
+
+export type UsageKind = "model" | "video";
+
+/**
+ * Start of the current allowance window: midnight UTC on the 1st.
+ * A calendar month rather than a rolling 30 days because an owner has to be
+ * able to predict it — "6 this month, resets on the 1st" is something support
+ * can say in one sentence, and it does not depend on when they subscribed
+ * (which, while billing is still manual, we do not reliably know).
+ */
+export function allowanceWindowStart(now: Date = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/** How many of `kind` this owner has spent in the current window. */
+export async function countGenerationsThisMonth(
+  ownerId: string,
+  kind: UsageKind
+): Promise<number> {
+  return prisma.usageEvent.count({
+    where: { userId: ownerId, kind, createdAt: { gte: allowanceWindowStart() } },
+  });
+}
+
+/**
+ * Record a spend. Deliberately called *after* the provider accepted the job,
+ * so a failure on their side does not burn the owner's allowance — we would
+ * rather under-count than charge someone for something that never ran.
+ */
+export async function recordGeneration(
+  ownerId: string,
+  kind: UsageKind,
+  itemId = ""
+): Promise<void> {
+  await prisma.usageEvent.create({ data: { userId: ownerId, kind, itemId } });
+}
+
+/** Days until the allowance resets, for the "try again on the 1st" message. */
+export function daysUntilAllowanceReset(now: Date = new Date()): number {
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return Math.max(1, Math.ceil((next.getTime() - now.getTime()) / 86_400_000));
 }
 
 /** 402 Payment Required with a consistent shape the mobile app understands. */

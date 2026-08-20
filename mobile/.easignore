@@ -1,3 +1,16 @@
+# EAS uses this file INSTEAD of .gitignore when it exists, so everything that
+# .gitignore would have kept out of the build tarball has to be repeated here.
+# Without the node_modules line every build compressed and uploaded ~600MB of
+# dependencies that EAS installs itself anyway — slow, and it fails outright if
+# the connection drops mid-upload.
+node_modules/
+.expo/
+dist/
+web-build/
+.DS_Store
+*.log
+
+# Build outputs and store assets — never needed to produce a build.
 *.aab
 *.apk
 *.ipa

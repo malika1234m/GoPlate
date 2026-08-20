@@ -37,7 +37,7 @@ export async function POST(req: Request, { params }: Params) {
     const used = await countVideos(user.id);
     if (!withinLimit(plan.maxVideos, used)) {
       return upgradeRequired(
-        `Your ${plan.label} plan includes ${plan.maxVideos} dish videos and you've used ${used}. Upgrade to Pro for unlimited videos.`
+        `Your ${plan.label} plan includes ${plan.maxVideos} dish videos and you've used ${used}. Remove a video from another dish, or upgrade for more.`
       );
     }
   }

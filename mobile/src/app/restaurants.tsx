@@ -361,9 +361,15 @@ export default function Restaurants() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.planTitle}>{billing.label} plan</Text>
                   <Text style={styles.planMeta}>
-                    {billing.plan === "starter"
-                      ? `${billing.usage.videos}/${billing.limits.maxVideos} videos · ${billing.usage.models}/${billing.limits.maxModels} 3D models`
-                      : `Unlimited videos & 3D · ${billing.usage.restaurants}/${billing.limits.maxRestaurants} restaurants`}
+                    {/* Every plan has a ceiling now, so every plan shows its
+                        usage. This used to special-case Starter and tell
+                        everyone else "Unlimited" — which was wrong for Basic
+                        as well as Pro. */}
+                    {`${billing.usage.videos}/${billing.limits.maxVideos} videos · ` +
+                      `${billing.usage.models}/${billing.limits.maxModels} 3D models` +
+                      (billing.limits.maxRestaurants > 1
+                        ? ` · ${billing.usage.restaurants}/${billing.limits.maxRestaurants} restaurants`
+                        : "")}
                   </Text>
                 </View>
                 <Button

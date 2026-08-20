@@ -2,7 +2,16 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { getAuthUser, unauthorized } from "@/lib/auth";
-import { accessExpired } from "@/lib/plans";
+import {
+  PLANS,
+  accessExpired,
+  countGenerationsThisMonth,
+  daysUntilAllowanceReset,
+  planOf,
+  recordGeneration,
+  upgradeRequired,
+  withinLimit,
+} from "@/lib/plans";
 import { uploadsDir } from "@/lib/uploads";
 import { optimizeGlb } from "@/lib/model-optimize";
 import { optimizeImage, optimizeVideoInPlace } from "@/lib/media-optimize";
@@ -75,6 +84,20 @@ export async function POST(req: Request) {
     ext = optimized.ext;
   }
 
+  // Metered here rather than where a video is attached to a dish, because the
+  // cost is the transcode below — it happens whether or not the clip ever ends
+  // up on the menu, so gating only on attachment leaves the CPU bill open.
+  if (VIDEO_EXTS.includes(ext)) {
+    const plan = PLANS[planOf(user)];
+    const spent = await countGenerationsThisMonth(user.id, "video");
+    if (!withinLimit(plan.videosPerMonth, spent)) {
+      return upgradeRequired(
+        `You've uploaded ${spent} dish videos this month, the most your ${plan.label} plan allows. ` +
+          `Your allowance resets in ${daysUntilAllowanceReset()} day(s), or upgrade for a bigger one.`
+      );
+    }
+  }
+
   const filename = `${crypto.randomBytes(12).toString("hex")}${ext}`;
   const filePath = path.join(dir, filename);
   await writeFile(filePath, bytes);
@@ -82,7 +105,10 @@ export async function POST(req: Request) {
   // Video is transcoded after the response: a 100 MB clip takes tens of
   // seconds, and making the phone wait risks it timing out and losing the
   // upload. The file is replaced in place, so this URL stays correct either way.
-  if (VIDEO_EXTS.includes(ext)) optimizeVideoInPlace(filePath);
+  if (VIDEO_EXTS.includes(ext)) {
+    await recordGeneration(user.id, "video");
+    optimizeVideoInPlace(filePath);
+  }
 
   return Response.json({ url: `/uploads/${filename}` }, { status: 201 });
 }

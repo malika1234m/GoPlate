@@ -376,8 +376,21 @@ export const api = {
     request<{
       plan: "basic" | "starter" | "pro";
       label: string;
-      limits: { maxRestaurants: number; maxModels: number; maxVideos: number };
-      usage: { restaurants: number; models: number; videos: number };
+      limits: {
+        maxRestaurants: number;
+        maxModels: number;
+        maxVideos: number;
+        /** Monthly build allowance — separate from the library caps above. */
+        modelsPerMonth: number;
+        videosPerMonth: number;
+      };
+      usage: {
+        restaurants: number;
+        models: number;
+        videos: number;
+        modelsThisMonth: number;
+        videosThisMonth: number;
+      };
       subscribed: boolean;
       trialDaysLeft: number;
       accessActive: boolean;

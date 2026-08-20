@@ -2,7 +2,17 @@ import { prisma } from "@/lib/db";
 import { getAuthUser, unauthorized, notFound } from "@/lib/auth";
 import { gen3dEnabled, startGeneration, checkGeneration } from "@/lib/gen3d";
 import { saveFromUrl } from "@/lib/uploads";
-import { PLANS, planOf, upgradeRequired, countModels, withinLimit, accessExpired } from "@/lib/plans";
+import {
+  PLANS,
+  planOf,
+  upgradeRequired,
+  countModels,
+  withinLimit,
+  accessExpired,
+  countGenerationsThisMonth,
+  recordGeneration,
+  daysUntilAllowanceReset,
+} from "@/lib/plans";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -30,14 +40,30 @@ export async function POST(req: Request, { params }: Params) {
       "3D models are available on Starter and Pro. Upgrade to turn your dish photos into spinnable 3D models."
     );
   }
-  // Regenerating an existing model doesn't consume a new slot.
+  // Two different limits, because they protect two different things.
+  //
+  // The inventory cap is what the plan sells: how many dishes may show in 3D
+  // at once. Regenerating a dish that already has a model doesn't consume a
+  // new slot — the menu still shows the same number of 3D dishes.
   if (item.modelStatus !== "READY" && item.modelStatus !== "PROCESSING") {
     const used = await countModels(user.id);
     if (!withinLimit(plan.maxModels, used)) {
       return upgradeRequired(
-        `Your ${plan.label} plan includes ${plan.maxModels} 3D models and you've used ${used}. Upgrade to Pro for unlimited 3D dishes.`
+        `Your ${plan.label} plan shows ${plan.maxModels} dishes in 3D and you've used ${used}. ` +
+          `Remove a 3D model from another dish, or upgrade for more.`
       );
     }
+  }
+
+  // The monthly allowance protects what a generation actually costs us, and so
+  // it applies to *every* run — including regenerating a dish that already has
+  // a model, which is exactly the case the inventory cap above lets through.
+  const spent = await countGenerationsThisMonth(user.id, "model");
+  if (!withinLimit(plan.modelsPerMonth, spent)) {
+    return upgradeRequired(
+      `You've built ${spent} 3D models this month, the most your ${plan.label} plan allows. ` +
+        `Your allowance resets in ${daysUntilAllowanceReset()} day(s), or upgrade for a bigger one.`
+    );
   }
 
   if (!gen3dEnabled()) {
@@ -66,6 +92,9 @@ export async function POST(req: Request, { params }: Params) {
 
   try {
     const jobId = await startGeneration(imageUrl);
+    // Only now, once the provider has accepted the job and we are committed to
+    // paying for it, does this count against the owner's allowance.
+    await recordGeneration(user.id, "model", id);
     const updated = await prisma.menuItem.update({
       where: { id },
       data: { modelStatus: "PROCESSING", modelJobId: jobId },

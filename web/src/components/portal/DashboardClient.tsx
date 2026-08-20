@@ -151,12 +151,18 @@ export function DashboardClient() {
                 Manage plan →
               </Link>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-4 sm:grid-cols-5">
               {(
                 [
                   ["Restaurants", billing.usage.restaurants, billing.limits.maxRestaurants],
                   ["3D models", billing.usage.models, billing.limits.maxModels],
                   ["Videos", billing.usage.videos, billing.limits.maxVideos],
+                  // The two meters below are the monthly allowance, which is a
+                  // different thing from the counts on the left: those are what
+                  // the menu holds, these are what was built since the 1st.
+                  // Shown so hitting the ceiling is never a surprise.
+                  ["Built this month", billing.usage.modelsThisMonth, billing.limits.modelsPerMonth],
+                  ["Videos this month", billing.usage.videosThisMonth, billing.limits.videosPerMonth],
                 ] as const
               ).map(([label, used, max]) => {
                 const unlimited = max === -1;

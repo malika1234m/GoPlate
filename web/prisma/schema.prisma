@@ -28,6 +28,29 @@ model User {
   passwordResets       PasswordResetToken[]
   upgradeRequests      UpgradeRequest[]
   supportMessages      SupportMessage[]
+  usageEvents          UsageEvent[]
+}
+
+/**
+ * One row per billable thing an owner spent: a 3D generation, a video
+ * transcode. Recorded because the plan caps used to count what a menu
+ * *currently holds* — dishes with a live model — which caps inventory, not
+ * spending. An owner could regenerate the same dish endlessly, or delete and
+ * re-add, and every attempt was a paid call to the 3D provider that nothing
+ * counted. Counting events instead makes the monthly allowance mean what the
+ * pricing page says it means.
+ * `itemId` is a plain string, not a relation: the dish may be deleted later
+ * and the spend still happened.
+ */
+model UsageEvent {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  kind      String // model | video
+  itemId    String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([userId, kind, createdAt])
 }
 
 /**

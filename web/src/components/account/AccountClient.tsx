@@ -55,7 +55,7 @@ const PLAN_CARDS: {
     id: "pro",
     name: "Pro",
     tagline: "The full 3D experience, plus live ordering",
-    features: ["Everything in Starter", "Unlimited videos & 3D models", "Live table ordering", "Kitchen orders screen", "Up to 10 restaurants"],
+    features: ["Everything in Starter", "100 dish videos + 100 3D models", "Live table ordering", "Kitchen orders screen", "Up to 10 restaurants"],
   },
 ];
 

@@ -71,7 +71,7 @@ const PLANS: {
     tagline: "The full 3D experience, plus live ordering",
     features: [
       "Everything in Starter",
-      "Unlimited videos & 3D models",
+      "100 dish videos + 100 3D models",
       "Your entire menu in 3D",
       "Live table ordering from your menu",
       "Kitchen orders screen — New → Preparing → Done",
